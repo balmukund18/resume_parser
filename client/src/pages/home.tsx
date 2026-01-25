@@ -1,9 +1,14 @@
 import { useState, useCallback, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { FileText, Sparkles, Shield, Zap } from "lucide-react";
+import { 
+  FileText, Sparkles, Shield, Zap, Target, Search, 
+  TrendingUp, Linkedin, Mail, BarChart3, CheckCircle2
+} from "lucide-react";
 import { UploadDropzone } from "@/components/upload-dropzone";
 import { ProcessingStatus } from "@/components/processing-status";
 import { ResumeResults } from "@/components/resume-results";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import type { ProcessingJob, ParsedResume, ExportFormat, UploadResponse } from "@shared/schema";
@@ -15,7 +20,6 @@ export default function Home() {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (file: File): Promise<UploadResponse> => {
       const formData = new FormData();
@@ -50,8 +54,7 @@ export default function Home() {
     },
   });
 
-  // Poll for job status
-  const { data: jobStatus, refetch: refetchStatus } = useQuery<ProcessingJob>({
+  const { data: jobStatus } = useQuery<ProcessingJob>({
     queryKey: ["/api/resumes", currentJobId, "status"],
     enabled: viewState === "processing" && !!currentJobId,
     refetchInterval: (query) => {
@@ -59,42 +62,36 @@ export default function Home() {
       if (data?.status === "completed" || data?.status === "failed") {
         return false;
       }
-      return 2000; // Poll every 2 seconds while processing
+      return 2000;
     },
   });
 
-  // Fetch full resume data when completed
   const { data: resumeData } = useQuery<ParsedResume>({
     queryKey: ["/api/resumes", currentJobId],
     enabled: jobStatus?.status === "completed" && !!currentJobId,
   });
 
-  // Handle file selection
   const handleFileSelect = useCallback((file: File) => {
     uploadMutation.mutate(file);
   }, [uploadMutation]);
 
-  // Handle viewing results
   const handleViewResults = useCallback(() => {
     if (resumeData) {
       setViewState("results");
     }
   }, [resumeData]);
 
-  // Handle retry
   const handleRetry = useCallback(() => {
     setCurrentJobId(null);
     setViewState("upload");
   }, []);
 
-  // Handle back to upload
   const handleBack = useCallback(() => {
     setCurrentJobId(null);
     setViewState("upload");
     queryClient.clear();
   }, []);
 
-  // Handle export
   const handleExport = useCallback(async (format: ExportFormat) => {
     if (!currentJobId) return;
     
@@ -132,7 +129,6 @@ export default function Home() {
     }
   }, [currentJobId, toast]);
 
-  // Auto-transition to results when data is ready
   useEffect(() => {
     if (viewState === "processing" && jobStatus?.status === "completed" && resumeData) {
       const timer = setTimeout(() => setViewState("results"), 500);
@@ -140,9 +136,60 @@ export default function Home() {
     }
   }, [viewState, jobStatus?.status, resumeData]);
 
+  const features = [
+    {
+      icon: Sparkles,
+      title: "AI-Powered Extraction",
+      description: "Extract structured data from any resume format using Google Gemini AI.",
+      color: "text-violet-500",
+      bgColor: "bg-violet-500/10",
+    },
+    {
+      icon: Shield,
+      title: "Confidence Scores",
+      description: "Each field includes a confidence score so you know what to review.",
+      color: "text-blue-500",
+      bgColor: "bg-blue-500/10",
+    },
+    {
+      icon: TrendingUp,
+      title: "Resume Scoring",
+      description: "Get comprehensive scores for completeness, keywords, and formatting.",
+      color: "text-green-500",
+      bgColor: "bg-green-500/10",
+    },
+    {
+      icon: Target,
+      title: "Skills Gap Analysis",
+      description: "Compare your skills against any job description to find gaps.",
+      color: "text-orange-500",
+      bgColor: "bg-orange-500/10",
+    },
+    {
+      icon: Search,
+      title: "Job Matching",
+      description: "See how well your resume matches specific job postings.",
+      color: "text-cyan-500",
+      bgColor: "bg-cyan-500/10",
+    },
+    {
+      icon: Zap,
+      title: "ATS Optimization",
+      description: "Get keyword suggestions to pass Applicant Tracking Systems.",
+      color: "text-yellow-500",
+      bgColor: "bg-yellow-500/10",
+    },
+  ];
+
+  const additionalFeatures = [
+    { icon: Linkedin, label: "LinkedIn Import" },
+    { icon: Mail, label: "Email Notifications" },
+    { icon: BarChart3, label: "7 Score Metrics" },
+    { icon: FileText, label: "PDF/DOCX/TXT" },
+  ];
+
   return (
-    <div className="min-h-screen">
-      {/* Header */}
+    <div className="min-h-screen flex flex-col">
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -154,60 +201,121 @@ export default function Home() {
               <p className="text-xs text-muted-foreground">AI-Powered Analysis</p>
             </div>
           </div>
+          <ThemeToggle />
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 flex-1">
         {viewState === "upload" && (
           <div className="space-y-12">
-            {/* Hero Section */}
-            <div className="text-center space-y-4 max-w-2xl mx-auto">
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+            <div className="text-center space-y-4 max-w-3xl mx-auto">
+              <Badge variant="secondary" className="mb-2" data-testid="badge-powered-by">
+                <Sparkles className="h-3 w-3 mr-1" />
+                Powered by Google Gemini AI
+              </Badge>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
                 Transform Resumes into
-                <span className="text-primary"> Structured Data</span>
+                <span className="text-primary"> Actionable Insights</span>
               </h2>
-              <p className="text-lg text-muted-foreground">
-                Upload a resume and let AI extract personal info, experience, education, 
-                skills, and more with confidence scoring.
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Upload a resume and get structured data extraction, skills analysis, 
+                job matching, ATS optimization, and more - all powered by AI.
               </p>
             </div>
 
-            {/* Upload Zone */}
             <UploadDropzone 
               onFileSelect={handleFileSelect}
               isUploading={uploadMutation.isPending}
             />
 
-            {/* Features */}
-            <div className="grid gap-6 sm:grid-cols-3 max-w-4xl mx-auto">
-              <div className="flex flex-col items-center text-center space-y-3 p-6 rounded-lg bg-card border">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Sparkles className="h-6 w-6 text-primary" />
+            <div className="flex flex-wrap justify-center gap-3" data-testid="additional-features">
+              {additionalFeatures.map((feature, i) => (
+                <div 
+                  key={i}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-full text-sm"
+                >
+                  <feature.icon className="h-4 w-4 text-primary" />
+                  <span className="text-muted-foreground">{feature.label}</span>
                 </div>
-                <h3 className="font-semibold">AI-Powered Extraction</h3>
-                <p className="text-sm text-muted-foreground">
-                  Advanced AI analyzes your resume and extracts structured data accurately.
-                </p>
+              ))}
+            </div>
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto" data-testid="features-grid">
+              {features.map((feature, i) => (
+                <div 
+                  key={i}
+                  className="flex flex-col items-start space-y-3 p-6 rounded-lg bg-card border hover-elevate transition-all"
+                  data-testid={`feature-card-${i}`}
+                >
+                  <div className={`p-3 rounded-lg ${feature.bgColor}`}>
+                    <feature.icon className={`h-5 w-5 ${feature.color}`} />
+                  </div>
+                  <h3 className="font-semibold">{feature.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {feature.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-center space-y-4 pt-8 border-t max-w-2xl mx-auto">
+              <h3 className="font-semibold text-lg">How It Works</h3>
+              <div className="grid sm:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                    <span className="text-primary font-bold">1</span>
+                  </div>
+                  <h4 className="font-medium">Upload Resume</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Drag & drop your PDF, DOCX, or TXT file
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                    <span className="text-primary font-bold">2</span>
+                  </div>
+                  <h4 className="font-medium">AI Processing</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Gemini AI extracts and structures your data
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                    <span className="text-primary font-bold">3</span>
+                  </div>
+                  <h4 className="font-medium">Get Insights</h4>
+                  <p className="text-sm text-muted-foreground">
+                    View analysis, scores, and recommendations
+                  </p>
+                </div>
               </div>
-              
-              <div className="flex flex-col items-center text-center space-y-3 p-6 rounded-lg bg-card border">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Shield className="h-6 w-6 text-primary" />
+            </div>
+
+            <div className="bg-card border rounded-lg p-6 max-w-2xl mx-auto" data-testid="api-key-notice">
+              <div className="flex items-start gap-4">
+                <div className="p-2 bg-amber-500/10 rounded-lg shrink-0">
+                  <Zap className="h-5 w-5 text-amber-500" />
                 </div>
-                <h3 className="font-semibold">Confidence Scores</h3>
-                <p className="text-sm text-muted-foreground">
-                  Each extracted field includes a confidence score so you know what to review.
-                </p>
-              </div>
-              
-              <div className="flex flex-col items-center text-center space-y-3 p-6 rounded-lg bg-card border">
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Zap className="h-6 w-6 text-primary" />
+                <div className="space-y-2">
+                  <h4 className="font-semibold">Gemini API Key Required</h4>
+                  <p className="text-sm text-muted-foreground">
+                    This app uses Google Gemini AI for resume parsing. Add your API key as the 
+                    <code className="mx-1 px-1.5 py-0.5 bg-muted rounded text-xs">GEMINI_API_KEY</code>
+                    environment variable to get started.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <a 
+                      href="https://aistudio.google.com/app/apikey" 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                      data-testid="link-get-api-key"
+                    >
+                      <CheckCircle2 className="h-3 w-3" />
+                      Get free API key
+                    </a>
+                  </div>
                 </div>
-                <h3 className="font-semibold">Multiple Formats</h3>
-                <p className="text-sm text-muted-foreground">
-                  Support for PDF, DOCX, and TXT files. Export results as JSON or CSV.
-                </p>
               </div>
             </div>
           </div>
@@ -232,8 +340,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t py-6 mt-12">
+      <footer className="border-t py-6 mt-auto">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
           <p>Resume Parser - AI-Powered Resume Analysis</p>
           <p className="text-xs mt-1">Files are processed securely and deleted after 24 hours.</p>
