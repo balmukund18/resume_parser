@@ -140,7 +140,7 @@ export default function Home() {
     {
       icon: Sparkles,
       title: "AI-Powered Extraction",
-      description: "Extract structured data from any resume format using Google Gemini AI.",
+      description: "Extract structured data from any resume format using advanced AI.",
       color: "text-violet-500",
       bgColor: "bg-violet-500/10",
     },
@@ -211,7 +211,7 @@ export default function Home() {
             <div className="text-center space-y-4 max-w-3xl mx-auto">
               <Badge variant="secondary" className="mb-2" data-testid="badge-powered-by">
                 <Sparkles className="h-3 w-3 mr-1" />
-                Powered by Google Gemini AI
+                AI-Powered Resume Analysis
               </Badge>
               <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
                 Transform Resumes into
@@ -276,7 +276,7 @@ export default function Home() {
                   </div>
                   <h4 className="font-medium">AI Processing</h4>
                   <p className="text-sm text-muted-foreground">
-                    Gemini AI extracts and structures your data
+                    AI extracts and structures your data
                   </p>
                 </div>
                 <div className="space-y-2">

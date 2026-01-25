@@ -22,7 +22,7 @@ This application allows users to upload resume files and uses Google Gemini AI t
 - **Impact Quantification Engine**: Transforms weak resume bullets into powerful quantified achievements with strong action verbs
 - **LinkedIn Import**: Step-by-step instructions for importing LinkedIn profile data via PDF export
 - **Enhanced Link Extraction**: Extracts all URLs, profile links, project repos, and certification credentials from resumes
-- **Email Notifications**: Log email notifications (requires email service setup)
+- **Email Notifications**: Send parsed resume data via email using nodemailer (requires SMTP configuration)
 
 ## Tech Stack
 
@@ -35,6 +35,7 @@ This application allows users to upload resume files and uses Google Gemini AI t
 - **DOCX Parsing**: mammoth
 - **Validation**: Joi
 - **Logging**: Winston
+- **Email**: Nodemailer
 - **State Management**: TanStack Query
 
 ## Project Structure
@@ -112,6 +113,10 @@ This application allows users to upload resume files and uses Google Gemini AI t
 - `AI_INTEGRATIONS_GEMINI_API_KEY` - Replit AI Integrations fallback
 - `DATABASE_URL` - PostgreSQL connection string (auto-configured by Replit)
 - `SESSION_SECRET` - Session secret for security
+- `SMTP_HOST` - SMTP server hostname for email (e.g., smtp.gmail.com)
+- `SMTP_PORT` - SMTP server port (default: 587)
+- `SMTP_USER` - SMTP username/email
+- `SMTP_PASS` - SMTP password or app password
 
 ## Features
 
@@ -132,10 +137,13 @@ The application is started with `npm run dev` which runs both the Express backen
 
 ## Recent Changes
 
+- 2025-01-25: Added nodemailer for sending parsed resume data via email
+- 2025-01-25: Added Extracted Links section to display parsed URLs
+- 2025-01-25: Fixed LinkedIn import UI - now shows clear PDF export instructions
+- 2025-01-25: Removed "Powered by Google Gemini AI" branding
 - 2025-01-25: Added Resume Credibility Checker (timeline analysis, overlapping dates, skill mismatches)
 - 2025-01-25: Added Impact Quantification Engine (transforms weak bullets into strong achievements)
 - 2025-01-25: Enhanced resume parser with comprehensive link extraction (profiles, projects, certifications)
-- 2025-01-25: Fixed LinkedIn import to provide step-by-step PDF export instructions
 - 2025-01-25: Added PostgreSQL database with Drizzle ORM for permanent storage
 - 2025-01-25: Added Skills Gap Analysis, Resume Scoring, Job Matching features
 - 2025-01-25: Added ATS Keyword Optimization feature

@@ -64,11 +64,8 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
   const [keywordResult, setKeywordResult] = useState<KeywordOptimization | null>(null);
   const [credibilityResult, setCredibilityResult] = useState<CredibilityResult | null>(null);
   const [impactResult, setImpactResult] = useState<ImpactQuantificationResult | null>(null);
-  const [linkedinUrl, setLinkedinUrl] = useState("");
-  const [linkedinInstructions, setLinkedinInstructions] = useState<string[] | null>(null);
-  const [linkedinUsername, setLinkedinUsername] = useState<string | null>(null);
   const [emailAddress, setEmailAddress] = useState("");
-  const [includeAnalysis, setIncludeAnalysis] = useState(true);
+  const [includeFullDetails, setIncludeFullDetails] = useState(true);
 
   const scoreMutation = useMutation({
     mutationFn: async () => {
@@ -165,28 +162,11 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
     },
   });
 
-  const linkedinMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/resumes/import-linkedin`, {
-        linkedinUrl,
-      });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      setLinkedinInstructions(data.instructions);
-      setLinkedinUsername(data.username);
-      toast({ title: "LinkedIn Import", description: data.message });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Import failed", description: error.message, variant: "destructive" });
-    },
-  });
-
   const emailMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/resumes/${resumeId}/send-email`, {
         email: emailAddress,
-        includeAnalysis,
+        includeAnalysis: includeFullDetails,
       });
       return res.json();
     },
@@ -741,58 +721,35 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                 <div className="flex items-start gap-3">
                   <Linkedin className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-blue-900 dark:text-blue-100">Import from LinkedIn</h4>
+                    <h4 className="font-semibold text-blue-900 dark:text-blue-100">Import from LinkedIn Profile</h4>
                     <p className="text-sm text-blue-800 dark:text-blue-200">
-                      For best results, download your LinkedIn profile as PDF and upload it directly.
+                      LinkedIn profiles cannot be scraped directly. Follow the steps below to download your profile as PDF and upload it to the parser.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="linkedin-url">LinkedIn Profile URL</Label>
-                <Input 
-                  id="linkedin-url"
-                  placeholder="https://linkedin.com/in/yourprofile"
-                  value={linkedinUrl}
-                  onChange={(e) => setLinkedinUrl(e.target.value)}
-                  data-testid="input-linkedin-url"
-                />
-              </div>
-              
-              <Button 
-                onClick={() => linkedinMutation.mutate()}
-                disabled={linkedinMutation.isPending || !linkedinUrl.includes("linkedin.com")}
-                data-testid="button-import-linkedin"
-              >
-                {linkedinMutation.isPending ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Importing...</>
-                ) : (
-                  <><Linkedin className="h-4 w-4 mr-2" /> Get Import Instructions</>
-                )}
-              </Button>
-
-              <div className="mt-6 space-y-3">
+              <div className="space-y-3">
                 <h4 className="font-semibold flex items-center gap-2">
                   <Info className="h-4 w-4 text-primary" />
                   How to Export LinkedIn Profile as PDF
                 </h4>
-                <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+                <ol className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
-                    <span>1.</span>
+                    <span className="font-medium text-foreground">1.</span>
                     <span>Go to your LinkedIn profile page</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span>2.</span>
+                    <span className="font-medium text-foreground">2.</span>
                     <span>Click the "More" button (three dots) near your profile photo</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span>3.</span>
+                    <span className="font-medium text-foreground">3.</span>
                     <span>Select "Save to PDF" from the dropdown menu</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span>4.</span>
-                    <span>Upload the downloaded PDF file to this parser</span>
+                    <span className="font-medium text-foreground">4.</span>
+                    <span>Upload the downloaded PDF file using the upload area on the home page</span>
                   </li>
                 </ol>
                 <Button 
@@ -815,9 +772,9 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <h4 className="font-semibold text-amber-900 dark:text-amber-100">Email Service Setup Required</h4>
+                    <h4 className="font-semibold text-amber-900 dark:text-amber-100">SMTP Configuration Required</h4>
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      Email notifications require an email service (SendGrid, Resend, etc.) to be configured. Currently, emails are logged but not sent.
+                      To send emails, configure SMTP settings: SMTP_HOST, SMTP_USER, SMTP_PASS, and optionally SMTP_PORT (defaults to 587).
                     </p>
                   </div>
                 </div>
@@ -838,13 +795,13 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                 
                 <div className="flex items-center space-x-2">
                   <Checkbox 
-                    id="include-analysis" 
-                    checked={includeAnalysis}
-                    onCheckedChange={(checked) => setIncludeAnalysis(checked === true)}
-                    data-testid="checkbox-include-analysis"
+                    id="include-full-details" 
+                    checked={includeFullDetails}
+                    onCheckedChange={(checked) => setIncludeFullDetails(checked === true)}
+                    data-testid="checkbox-include-full-details"
                   />
-                  <Label htmlFor="include-analysis" className="text-sm font-normal">
-                    Include analysis results (scores, skills gap, etc.)
+                  <Label htmlFor="include-full-details" className="text-sm font-normal">
+                    Include full details (experience, education, projects)
                   </Label>
                 </div>
                 
@@ -866,25 +823,25 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                 <ul className="space-y-1 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-3 w-3 text-green-500" />
-                    Parsed resume data (contact info, experience, education)
+                    Contact information
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle2 className="h-3 w-3 text-green-500" />
                     Skills summary
                   </li>
-                  {includeAnalysis && (
+                  {includeFullDetails && (
                     <>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-3 w-3 text-green-500" />
-                        Resume score and breakdown
+                        Work experience details
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-3 w-3 text-green-500" />
-                        Skills gap analysis results
+                        Education history
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-3 w-3 text-green-500" />
-                        ATS optimization suggestions
+                        Projects and certifications
                       </li>
                     </>
                   )}

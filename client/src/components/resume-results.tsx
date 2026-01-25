@@ -3,7 +3,7 @@ import {
   User, Mail, Phone, MapPin, Linkedin, Github, 
   Briefcase, GraduationCap, Wrench, FolderOpen, 
   Award, Globe, ChevronDown, ChevronUp, Download, 
-  ArrowLeft, FileJson, FileSpreadsheet
+  ArrowLeft, FileJson, FileSpreadsheet, ExternalLink
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -95,6 +95,12 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
 
   const hasContactInfo = resume.contactInfo.email || resume.contactInfo.phone || 
     resume.contactInfo.address || resume.contactInfo.linkedin || resume.contactInfo.github;
+
+  const hasLinks = resume.links && (
+    (resume.links.profiles && resume.links.profiles.length > 0) ||
+    (resume.links.projects && resume.links.projects.length > 0) ||
+    (resume.links.additional && resume.links.additional.length > 0)
+  );
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6" data-testid="resume-results">
@@ -373,6 +379,79 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
           ))}
         </div>
       </Section>
+
+      {/* Extracted Links */}
+      {hasLinks && (
+        <Section
+          id="links"
+          title="Extracted Links"
+          icon={ExternalLink}
+          isEmpty={!hasLinks}
+        >
+          <div className="space-y-4">
+            {resume.links?.profiles && resume.links.profiles.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Profile Links</h4>
+                <div className="space-y-1">
+                  {resume.links.profiles.map((link, index) => (
+                    <a
+                      key={index}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      data-testid={`link-profile-${index}`}
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      <span>{link.platform || link.anchorText || link.url}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {resume.links?.projects && resume.links.projects.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Project Links</h4>
+                <div className="space-y-1">
+                  {resume.links.projects.map((link, index) => (
+                    <a
+                      key={index}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      data-testid={`link-project-${index}`}
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      <span>{link.projectName || link.anchorText || link.url}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+            {resume.links?.additional && resume.links.additional.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-muted-foreground">Additional Links</h4>
+                <div className="space-y-1">
+                  {resume.links.additional.map((link, index) => (
+                    <a
+                      key={index}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-primary hover:underline"
+                      data-testid={`link-additional-${index}`}
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      <span>{link.context || link.anchorText || link.url}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
 
       {/* Metadata */}
       <Card className="bg-muted/50">

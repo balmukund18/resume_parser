@@ -17,6 +17,7 @@ import {
 } from "./utils/resume-parser";
 import { validate, uploadSchema, exportSchema, idSchema } from "./utils/validation";
 import { createModuleLogger } from "./utils/logger";
+import { sendResumeEmail, isEmailConfigured } from "./utils/email";
 import type { ParsedResume, JobDescriptionInput } from "@shared/schema";
 
 const logger = createModuleLogger("Routes");
@@ -584,9 +585,10 @@ export async function registerRoutes(
     }
   });
 
-  // Email Notification (placeholder - requires email service setup)
+  // Email Notification using nodemailer
   app.post("/api/resumes/:id/send-email", async (req: Request, res: Response) => {
-    const validation = validate(idSchema, { id: req.params.id });
+    const resumeId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const validation = validate(idSchema, { id: resumeId });
     if (validation.error) {
       return res.status(400).json({ message: validation.error });
     }
@@ -597,28 +599,65 @@ export async function registerRoutes(
     }
 
     try {
-      const parsedResume = await storage.getParsedResume(req.params.id);
+      const parsedResume = await storage.getParsedResume(resumeId);
       if (!parsedResume) {
         return res.status(404).json({ message: "Resume not found" });
       }
 
+      // Check if email is configured
+      if (!isEmailConfigured()) {
+        await storage.logEmailNotification(
+          resumeId,
+          email,
+          `Resume Analysis Results - ${parsedResume.name}`,
+          "failed_not_configured"
+        );
+        return res.status(503).json({
+          message: "Email service not configured",
+          details: "Please set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables to enable email.",
+          configured: false,
+        });
+      }
+
       // Log the notification attempt
       await storage.logEmailNotification(
-        req.params.id,
+        resumeId,
         email,
         `Resume Analysis Results - ${parsedResume.name}`,
         "pending"
       );
 
-      // Note: Actual email sending requires email service integration
-      logger.info(`Email notification logged for resume ${req.params.id} to ${email}`);
-      res.json({
-        message: "Email notification queued. Note: Email service requires configuration.",
-        email,
-        resumeId: req.params.id,
-        includeAnalysis: includeAnalysis || false,
-        status: "Email service not configured. To enable, set up SendGrid or Resend integration."
-      });
+      // Send the email using nodemailer
+      const result = await sendResumeEmail(email, parsedResume, includeAnalysis ?? true);
+
+      if (result.success) {
+        await storage.logEmailNotification(
+          resumeId,
+          email,
+          `Resume Analysis Results - ${parsedResume.name}`,
+          "sent"
+        );
+        logger.info(`Email sent successfully for resume ${resumeId} to ${email}`);
+        res.json({
+          message: "Email sent successfully",
+          email,
+          resumeId,
+          messageId: result.messageId,
+          includeAnalysis: includeAnalysis ?? true,
+        });
+      } else {
+        await storage.logEmailNotification(
+          resumeId,
+          email,
+          `Resume Analysis Results - ${parsedResume.name}`,
+          "failed"
+        );
+        logger.error(`Email sending failed for resume ${resumeId}: ${result.error}`);
+        res.status(500).json({
+          message: "Failed to send email",
+          error: result.error,
+        });
+      }
     } catch (error) {
       logger.error(`Email notification failed: ${error}`);
       res.status(500).json({ message: "Failed to send email notification" });
