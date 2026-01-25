@@ -1,11 +1,7 @@
 import fs from "fs";
 import path from "path";
 import * as mammoth from "mammoth";
-import * as pdfParseModule from "pdf-parse";
 import { createModuleLogger } from "./logger";
-
-// Handle both ESM and CJS exports
-const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 
 const logger = createModuleLogger("TextExtractor");
 
@@ -53,6 +49,10 @@ export function validateMimeType(mimeType: string, fileType: SupportedFileType):
  */
 async function extractFromPdf(filePath: string): Promise<ExtractionResult> {
   logger.info(`Extracting text from PDF: ${filePath}`);
+  
+  // Dynamic import to handle ESM/CJS compatibility
+  const pdfParseModule = await import("pdf-parse");
+  const pdfParse = pdfParseModule.default || pdfParseModule;
   
   const dataBuffer = fs.readFileSync(filePath);
   const data = await pdfParse(dataBuffer);
