@@ -151,6 +151,16 @@ export class DatabaseStorage implements IStorage {
       projects: result.projects,
       certifications: result.certifications,
       languages: result.languages,
+      extendedContact: {
+        portfolio: result.contactInfo.portfolio,
+        leetcode: result.contactInfo.leetcode,
+        hackerrank: result.contactInfo.hackerrank,
+        kaggle: result.contactInfo.kaggle,
+        codeforces: result.contactInfo.codeforces,
+        twitter: result.contactInfo.twitter,
+        otherProfiles: result.contactInfo.otherProfiles,
+      },
+      links: result.links,
       originalFilename: result.metadata.originalFilename,
       fileType: result.metadata.fileType,
       fileSize: result.metadata.fileSize,
@@ -290,6 +300,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   private resumeToParsedResume(resume: Resume): ParsedResume {
+    const extContact = resume.extendedContact as {
+      portfolio?: string;
+      leetcode?: string;
+      hackerrank?: string;
+      kaggle?: string;
+      codeforces?: string;
+      twitter?: string;
+      otherProfiles?: string[];
+    } | null;
+
     return {
       id: resume.id,
       name: resume.name,
@@ -299,6 +319,13 @@ export class DatabaseStorage implements IStorage {
         address: resume.address || undefined,
         linkedin: resume.linkedin || undefined,
         github: resume.github || undefined,
+        portfolio: extContact?.portfolio || undefined,
+        leetcode: extContact?.leetcode || undefined,
+        hackerrank: extContact?.hackerrank || undefined,
+        kaggle: extContact?.kaggle || undefined,
+        codeforces: extContact?.codeforces || undefined,
+        twitter: extContact?.twitter || undefined,
+        otherProfiles: extContact?.otherProfiles || undefined,
       },
       summary: resume.summary || undefined,
       experience: resume.experience || [],
@@ -307,6 +334,7 @@ export class DatabaseStorage implements IStorage {
       projects: resume.projects || [],
       certifications: resume.certifications || [],
       languages: resume.languages || [],
+      links: resume.links || undefined,
       metadata: {
         originalFilename: resume.originalFilename,
         fileType: resume.fileType,

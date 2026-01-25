@@ -18,7 +18,10 @@ This application allows users to upload resume files and uses Google Gemini AI t
 - **Resume Scoring**: Rate completeness, keywords, formatting, experience, education, and skills (7 metrics)
 - **Job Matching**: Match resumes against job postings with detailed breakdown
 - **ATS Keyword Optimization**: Suggest missing keywords for better ATS compatibility
-- **LinkedIn Import**: Guidance for importing LinkedIn profile data (via PDF export)
+- **Resume Credibility Checker**: Flags overlapping dates, unrealistic timelines, skill-experience mismatches, rapid career progression
+- **Impact Quantification Engine**: Transforms weak resume bullets into powerful quantified achievements with strong action verbs
+- **LinkedIn Import**: Step-by-step instructions for importing LinkedIn profile data via PDF export
+- **Enhanced Link Extraction**: Extracts all URLs, profile links, project repos, and certification credentials from resumes
 - **Email Notifications**: Log email notifications (requires email service setup)
 
 ## Tech Stack
@@ -94,7 +97,9 @@ This application allows users to upload resume files and uses Google Gemini AI t
 - `POST /api/resumes/:id/score` - Score resume quality (7 metrics)
 - `POST /api/resumes/:id/match-job` - Match resume to job description
 - `POST /api/resumes/:id/optimize-keywords` - Get ATS keyword recommendations
-- `POST /api/resumes/import-linkedin` - LinkedIn import guidance
+- `POST /api/resumes/:id/credibility` - Check resume credibility (timeline analysis, flags)
+- `POST /api/resumes/:id/impact` - Quantify impact of resume bullets (improve weak bullets)
+- `POST /api/resumes/import-linkedin` - LinkedIn import instructions
 - `POST /api/resumes/:id/send-email` - Log email notification
 
 ### Job Description Endpoints
@@ -127,9 +132,13 @@ The application is started with `npm run dev` which runs both the Express backen
 
 ## Recent Changes
 
+- 2025-01-25: Added Resume Credibility Checker (timeline analysis, overlapping dates, skill mismatches)
+- 2025-01-25: Added Impact Quantification Engine (transforms weak bullets into strong achievements)
+- 2025-01-25: Enhanced resume parser with comprehensive link extraction (profiles, projects, certifications)
+- 2025-01-25: Fixed LinkedIn import to provide step-by-step PDF export instructions
 - 2025-01-25: Added PostgreSQL database with Drizzle ORM for permanent storage
 - 2025-01-25: Added Skills Gap Analysis, Resume Scoring, Job Matching features
 - 2025-01-25: Added ATS Keyword Optimization feature
-- 2025-01-25: Added AnalysisPanel component with tabbed UI
+- 2025-01-25: Added AnalysisPanel component with tabbed UI (8 tabs)
 - 2025-01-25: Modified Gemini integration to support user's own API key (GEMINI_API_KEY)
 - 2025-01-25: Fixed PDF parsing with pdfjs-dist instead of pdf-parse

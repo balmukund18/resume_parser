@@ -229,6 +229,13 @@ export async function parseResumeWithAI(
         address: parsedData.contactInfo?.address || undefined,
         linkedin: parsedData.contactInfo?.linkedin || undefined,
         github: parsedData.contactInfo?.github || undefined,
+        portfolio: parsedData.contactInfo?.portfolio || undefined,
+        leetcode: parsedData.contactInfo?.leetcode || undefined,
+        hackerrank: parsedData.contactInfo?.hackerrank || undefined,
+        kaggle: parsedData.contactInfo?.kaggle || undefined,
+        codeforces: parsedData.contactInfo?.codeforces || undefined,
+        twitter: parsedData.contactInfo?.twitter || undefined,
+        otherProfiles: parsedData.contactInfo?.otherProfiles || undefined,
       },
       summary: parsedData.summary || undefined,
       experience: (parsedData.experience || []).map((exp: any) => ({
@@ -238,6 +245,7 @@ export async function parseResumeWithAI(
         endDate: exp.endDate || undefined,
         responsibilities: exp.responsibilities || [],
         achievements: exp.achievements || [],
+        links: exp.links || undefined,
         confidenceScore: exp.confidenceScore || 75,
       })),
       education: (parsedData.education || []).map((edu: any) => ({
@@ -245,6 +253,7 @@ export async function parseResumeWithAI(
         degree: edu.degree || "",
         graduationDate: edu.graduationDate || undefined,
         gpa: edu.gpa || undefined,
+        links: edu.links || undefined,
         confidenceScore: edu.confidenceScore || 75,
       })),
       skills: {
@@ -257,6 +266,8 @@ export async function parseResumeWithAI(
         description: proj.description || "",
         technologies: proj.technologies || [],
         url: proj.url || undefined,
+        demoUrl: proj.demoUrl || undefined,
+        repoUrl: proj.repoUrl || undefined,
         confidenceScore: proj.confidenceScore || 75,
       })),
       certifications: (parsedData.certifications || []).map((cert: any) => ({
@@ -264,6 +275,7 @@ export async function parseResumeWithAI(
         issuer: cert.issuer || "",
         issueDate: cert.issueDate || undefined,
         expirationDate: cert.expirationDate || undefined,
+        credentialUrl: cert.credentialUrl || undefined,
         confidenceScore: cert.confidenceScore || 75,
       })),
       languages: (parsedData.languages || []).map((lang: any) => ({
@@ -271,6 +283,11 @@ export async function parseResumeWithAI(
         proficiency: lang.proficiency || "Professional",
         confidenceScore: lang.confidenceScore || 75,
       })),
+      links: parsedData.links ? {
+        profiles: parsedData.links.profiles || [],
+        projects: parsedData.links.projects || [],
+        additional: parsedData.links.additional || [],
+      } : undefined,
       metadata: {
         ...metadata,
         processingTime,

@@ -5,6 +5,17 @@ import { relations } from "drizzle-orm";
 
 // ============== DRIZZLE DATABASE TABLES ==============
 
+// Extended contact info type for JSONB storage
+interface ExtendedContactInfo {
+  portfolio?: string;
+  leetcode?: string;
+  hackerrank?: string;
+  kaggle?: string;
+  codeforces?: string;
+  twitter?: string;
+  otherProfiles?: string[];
+}
+
 // Resumes table - stores parsed resume data permanently
 export const resumes = pgTable("resumes", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -21,6 +32,12 @@ export const resumes = pgTable("resumes", {
   projects: jsonb("projects").$type<Project[]>().default([]),
   certifications: jsonb("certifications").$type<Certification[]>().default([]),
   languages: jsonb("languages").$type<Language[]>().default([]),
+  extendedContact: jsonb("extended_contact").$type<ExtendedContactInfo>(),
+  links: jsonb("links").$type<{
+    profiles?: { url: string; anchorText?: string; platform?: string; confidenceScore?: number }[];
+    projects?: { url: string; anchorText?: string; projectName?: string; confidenceScore?: number }[];
+    additional?: { url: string; anchorText?: string; context?: string; confidenceScore?: number }[];
+  }>(),
   originalFilename: text("original_filename").notNull(),
   fileType: text("file_type").notNull(),
   fileSize: integer("file_size").notNull(),
@@ -151,6 +168,13 @@ export const contactInfoSchema = z.object({
   address: z.string().optional(),
   linkedin: z.string().optional(),
   github: z.string().optional(),
+  portfolio: z.string().optional(),
+  leetcode: z.string().optional(),
+  hackerrank: z.string().optional(),
+  kaggle: z.string().optional(),
+  codeforces: z.string().optional(),
+  twitter: z.string().optional(),
+  otherProfiles: z.array(z.string()).optional(),
 });
 
 export const experienceSchema = z.object({
@@ -160,6 +184,7 @@ export const experienceSchema = z.object({
   endDate: z.string().optional(),
   responsibilities: z.array(z.string()),
   achievements: z.array(z.string()),
+  links: z.array(z.string()).optional(),
   confidenceScore: z.number().min(0).max(100),
 });
 
@@ -168,6 +193,7 @@ export const educationSchema = z.object({
   degree: z.string(),
   graduationDate: z.string().optional(),
   gpa: z.number().optional(),
+  links: z.array(z.string()).optional(),
   confidenceScore: z.number().min(0).max(100),
 });
 
@@ -182,6 +208,8 @@ export const projectSchema = z.object({
   description: z.string(),
   technologies: z.array(z.string()),
   url: z.string().optional(),
+  demoUrl: z.string().optional(),
+  repoUrl: z.string().optional(),
   confidenceScore: z.number().min(0).max(100),
 });
 
@@ -190,6 +218,7 @@ export const certificationSchema = z.object({
   issuer: z.string(),
   issueDate: z.string().optional(),
   expirationDate: z.string().optional(),
+  credentialUrl: z.string().optional(),
   confidenceScore: z.number().min(0).max(100),
 });
 
@@ -208,6 +237,33 @@ export const metadataSchema = z.object({
   language: z.string().optional(),
 });
 
+export const profileLinkSchema = z.object({
+  url: z.string(),
+  anchorText: z.string().optional(),
+  platform: z.string().optional(),
+  confidenceScore: z.number().min(0).max(100).optional(),
+});
+
+export const projectLinkSchema = z.object({
+  url: z.string(),
+  anchorText: z.string().optional(),
+  projectName: z.string().optional(),
+  confidenceScore: z.number().min(0).max(100).optional(),
+});
+
+export const additionalLinkSchema = z.object({
+  url: z.string(),
+  anchorText: z.string().optional(),
+  context: z.string().optional(),
+  confidenceScore: z.number().min(0).max(100).optional(),
+});
+
+export const parsedLinksSchema = z.object({
+  profiles: z.array(profileLinkSchema).optional(),
+  projects: z.array(projectLinkSchema).optional(),
+  additional: z.array(additionalLinkSchema).optional(),
+});
+
 export const parsedResumeSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -219,6 +275,7 @@ export const parsedResumeSchema = z.object({
   projects: z.array(projectSchema),
   certifications: z.array(certificationSchema),
   languages: z.array(languageSchema),
+  links: parsedLinksSchema.optional(),
   metadata: metadataSchema,
 });
 
@@ -350,6 +407,10 @@ export type BulletImprovement = z.infer<typeof bulletImprovementSchema>;
 export type ImpactQuantificationResult = z.infer<typeof impactQuantificationResultSchema>;
 export type ExtractedLink = z.infer<typeof extractedLinkSchema>;
 export type LinksExtraction = z.infer<typeof linksExtractionSchema>;
+export type ProfileLink = z.infer<typeof profileLinkSchema>;
+export type ProjectLink = z.infer<typeof projectLinkSchema>;
+export type AdditionalLink = z.infer<typeof additionalLinkSchema>;
+export type ParsedLinks = z.infer<typeof parsedLinksSchema>;
 
 // Database types
 export type Resume = typeof resumes.$inferSelect;
