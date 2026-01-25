@@ -8,6 +8,65 @@ import type {
 
 const logger = createModuleLogger("ResumeParser");
 
+/**
+ * Extract and parse JSON from AI response text
+ * Handles multiple formats: markdown code blocks, plain JSON, JSON with surrounding text
+ */
+function extractJSONFromResponse(responseText: string, functionName: string): any {
+  if (!responseText || responseText.trim().length === 0) {
+    throw new Error(`Empty response from AI in ${functionName}`);
+  }
+
+  let jsonStr = responseText.trim();
+  
+  // Strategy 1: Extract from markdown code blocks (```json ... ``` or ``` ... ```)
+  const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (jsonMatch) {
+    jsonStr = jsonMatch[1].trim();
+  } else {
+    // Strategy 2: Find JSON object boundaries { ... }
+    const objectMatch = responseText.match(/\{[\s\S]*\}/);
+    if (objectMatch) {
+      jsonStr = objectMatch[0];
+    } else {
+      // Strategy 3: Try to find JSON array [ ... ]
+      const arrayMatch = responseText.match(/\[[\s\S]*\]/);
+      if (arrayMatch) {
+        jsonStr = arrayMatch[0];
+      }
+    }
+  }
+  
+  // Clean up common issues
+  jsonStr = jsonStr
+    .replace(/^[^{[]*/, '') // Remove leading non-JSON text
+    .replace(/[^}\]]*$/, '') // Remove trailing non-JSON text
+    .trim();
+  
+  if (jsonStr.length < 2) {
+    logger.error(`No valid JSON found in ${functionName} response`, {
+      responseLength: responseText.length,
+      responsePreview: responseText.substring(0, 500),
+    });
+    throw new Error(`No valid JSON found in AI response for ${functionName}`);
+  }
+  
+  try {
+    return JSON.parse(jsonStr);
+  } catch (parseError: any) {
+    logger.error(`Failed to parse JSON in ${functionName}`, {
+      error: parseError.message,
+      responseLength: responseText.length,
+      extractedLength: jsonStr.length,
+      responsePreview: responseText.substring(0, 500),
+      extractedPreview: jsonStr.substring(0, 500),
+      position: parseError.message.match(/position (\d+)/)?.[1],
+    });
+    
+    throw new Error(`Failed to parse AI response in ${functionName}: ${parseError.message}`);
+  }
+}
+
 const RESUME_PARSING_PROMPT = `You are an expert resume-parsing and document-analysis AI with deep knowledge of resume formats, industry standards, and data extraction best practices.
 
 Your task is to analyze the provided resume text and extract structured, accurate information with high precision.
@@ -281,20 +340,8 @@ export async function parseResumeWithAI(
     const responseText = response.text || "";
     logger.info(`Received response from ${response.provider} (${responseText.length} chars)`);
     
-    // Extract JSON from response
-    let jsonStr = responseText;
-    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1].trim();
-    }
-    
-    let parsedData;
-    try {
-      parsedData = JSON.parse(jsonStr);
-    } catch (parseError) {
-      logger.error("Failed to parse AI response as JSON");
-      throw new Error("Failed to parse AI response");
-    }
+    // Extract and parse JSON using helper function
+    const parsedData = extractJSONFromResponse(responseText, "parseResumeWithAI");
     
     const processingTime = Date.now() - startTime;
     logger.info(`Resume parsing completed in ${processingTime}ms`);
@@ -486,9 +533,7 @@ Be thorough, specific, and constructive. Only return valid JSON.`;
     config: { temperature: 0.2 },
   });
   
-  const text = response.text || "{}";
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
-  return JSON.parse(jsonMatch[1] || text);
+  return extractJSONFromResponse(response.text || "", "analyzeSkillsGap");
 }
 
 /**
@@ -606,9 +651,7 @@ Be critical but constructive. Only return valid JSON.`;
     config: { temperature: 0.2 },
   });
   
-  const text = response.text || "{}";
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
-  return JSON.parse(jsonMatch[1] || text);
+  return extractJSONFromResponse(response.text || "", "scoreResume");
 }
 
 /**
@@ -697,9 +740,7 @@ Be thorough, specific, and objective. Only return valid JSON.`;
     config: { temperature: 0.2 },
   });
   
-  const text = response.text || "{}";
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
-  return JSON.parse(jsonMatch[1] || text);
+  return extractJSONFromResponse(response.text || "", "matchResumeToJob");
 }
 
 /**
@@ -797,9 +838,7 @@ Be specific and actionable. Only return valid JSON.`;
     config: { temperature: 0.2 },
   });
   
-  const text = response.text || "{}";
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
-  return JSON.parse(jsonMatch[1] || text);
+  return extractJSONFromResponse(response.text || "", "optimizeKeywords");
 }
 
 /**
@@ -871,9 +910,7 @@ Only return valid JSON.`;
     config: { temperature: 0.2 },
   });
   
-  const text = response.text || "{}";
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
-  return JSON.parse(jsonMatch[1] || text);
+  return extractJSONFromResponse(response.text || "", "checkCredibility");
 }
 
 /**
@@ -938,9 +975,7 @@ Only return valid JSON.`;
       config: { temperature: 0.3 },
     });
     
-    const text = response.text || "{}";
-    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
-    return JSON.parse(jsonMatch[1] || text);
+    return extractJSONFromResponse(response.text || "", "quantifyImpact");
   } catch (error: any) {
     logger.error(`Impact quantification failed: ${error.message || String(error)}`);
     // Re-throw with more context

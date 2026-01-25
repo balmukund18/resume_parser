@@ -99,10 +99,10 @@ export const rateLimiters = {
     maxRequests: 100,
   }),
 
-  // Upload endpoint: 10 requests per hour (more restrictive)
+  // Upload endpoint: 20 requests per hour (allows for testing and retries)
   upload: createRateLimiter({
     windowMs: 60 * 60 * 1000, // 1 hour
-    maxRequests: 10,
+    maxRequests: 20, // Increased from 10 to allow for testing/retries
   }),
 
   // Analysis endpoints: 30 requests per hour
