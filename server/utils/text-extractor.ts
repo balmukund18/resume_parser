@@ -1,10 +1,11 @@
 import fs from "fs";
 import path from "path";
 import * as mammoth from "mammoth";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
+import * as pdfParseModule from "pdf-parse";
 import { createModuleLogger } from "./logger";
+
+// Handle both ESM and CJS exports
+const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 
 const logger = createModuleLogger("TextExtractor");
 
