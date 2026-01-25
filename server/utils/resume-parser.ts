@@ -1,6 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { createModuleLogger } from "./logger";
-import type { ParsedResume, Metadata, SkillsGapResult, ResumeScoreResult, JobMatchResult, KeywordOptimization } from "@shared/schema";
+import type { 
+  ParsedResume, Metadata, SkillsGapResult, ResumeScoreResult, 
+  JobMatchResult, KeywordOptimization, CredibilityResult, ImpactQuantificationResult 
+} from "@shared/schema";
 
 const logger = createModuleLogger("ResumeParser");
 
@@ -29,7 +32,20 @@ function getGeminiClient(): GoogleGenAI {
   throw new Error("No Gemini API key configured. Set GEMINI_API_KEY environment variable.");
 }
 
-const RESUME_PARSING_PROMPT = `You are an expert resume parser. Analyze the following resume text and extract structured information.
+const RESUME_PARSING_PROMPT = `You are an expert resume-parsing and document-analysis AI.
+
+Analyze the following resume text and extract structured information. 
+
+CRITICAL: LINK EXTRACTION IS A FIRST-CLASS FEATURE
+Extract EVERY link found in the document, including:
+- Visible URLs written as text
+- Embedded or hidden hyperlinks (anchor text with URL)
+- Shortened or masked links
+- Profile links: LinkedIn, GitHub, LeetCode, Codeforces, HackerRank, Kaggle, Portfolio, Personal Website
+- Project links: Live demos, GitHub repos, deployed apps, documentation
+- Experience links: Company websites, product pages, tools, platforms
+- Education links: Institution websites, course pages, certificates
+- Certification links: Credential verification or issuer links
 
 Return a JSON object with the following structure:
 {
@@ -39,7 +55,14 @@ Return a JSON object with the following structure:
     "phone": "Phone number or null",
     "address": "Location/address or null",
     "linkedin": "LinkedIn URL or null",
-    "github": "GitHub URL or null"
+    "github": "GitHub URL or null",
+    "portfolio": "Portfolio/personal website URL or null",
+    "leetcode": "LeetCode URL or null",
+    "hackerrank": "HackerRank URL or null",
+    "kaggle": "Kaggle URL or null",
+    "codeforces": "Codeforces URL or null",
+    "twitter": "Twitter/X URL or null",
+    "otherProfiles": ["Array of other profile URLs"]
   },
   "summary": "Professional summary or objective text or null",
   "experience": [
@@ -50,6 +73,7 @@ Return a JSON object with the following structure:
       "endDate": "End date or 'Present' or null",
       "responsibilities": ["List of job responsibilities"],
       "achievements": ["Notable achievements"],
+      "links": ["Any URLs mentioned in this experience entry"],
       "confidenceScore": 0-100
     }
   ],
@@ -59,6 +83,7 @@ Return a JSON object with the following structure:
       "degree": "Degree title",
       "graduationDate": "Graduation date or null",
       "gpa": GPA as number or null,
+      "links": ["Institution website, course links, etc."],
       "confidenceScore": 0-100
     }
   ],
@@ -73,6 +98,8 @@ Return a JSON object with the following structure:
       "description": "Brief description",
       "technologies": ["Technologies used"],
       "url": "Project URL or null",
+      "demoUrl": "Live demo URL or null",
+      "repoUrl": "GitHub/repo URL or null",
       "confidenceScore": 0-100
     }
   ],
@@ -82,6 +109,7 @@ Return a JSON object with the following structure:
       "issuer": "Issuing organization",
       "issueDate": "Issue date or null",
       "expirationDate": "Expiration date or null",
+      "credentialUrl": "Verification/credential URL or null",
       "confidenceScore": 0-100
     }
   ],
@@ -92,6 +120,11 @@ Return a JSON object with the following structure:
       "confidenceScore": 0-100
     }
   ],
+  "links": {
+    "profiles": [{"url": "URL", "anchorText": "text or null", "platform": "LinkedIn/GitHub/etc", "confidenceScore": 0-100}],
+    "projects": [{"url": "URL", "anchorText": "text or null", "projectName": "if identifiable", "confidenceScore": 0-100}],
+    "additional": [{"url": "URL", "anchorText": "text or null", "context": "where found", "confidenceScore": 0-100}]
+  },
   "detectedLanguage": "en or es (detected language of resume)"
 }
 
@@ -105,6 +138,9 @@ IMPORTANT:
 - Dates should be in YYYY-MM-DD or YYYY-MM or YYYY format when possible
 - Extract as much relevant information as possible
 - Be thorough but accurate - only include information that is clearly in the resume
+- Deduplicate links and normalize URLs (use https, remove tracking parameters)
+- Do NOT hallucinate or infer links that are not explicitly present
+- Link extraction must be treated as a FIRST-CLASS feature - missing links is a parsing failure
 
 RESUME TEXT:
 `;
@@ -193,6 +229,13 @@ export async function parseResumeWithAI(
         address: parsedData.contactInfo?.address || undefined,
         linkedin: parsedData.contactInfo?.linkedin || undefined,
         github: parsedData.contactInfo?.github || undefined,
+        portfolio: parsedData.contactInfo?.portfolio || undefined,
+        leetcode: parsedData.contactInfo?.leetcode || undefined,
+        hackerrank: parsedData.contactInfo?.hackerrank || undefined,
+        kaggle: parsedData.contactInfo?.kaggle || undefined,
+        codeforces: parsedData.contactInfo?.codeforces || undefined,
+        twitter: parsedData.contactInfo?.twitter || undefined,
+        otherProfiles: parsedData.contactInfo?.otherProfiles || undefined,
       },
       summary: parsedData.summary || undefined,
       experience: (parsedData.experience || []).map((exp: any) => ({
@@ -202,6 +245,7 @@ export async function parseResumeWithAI(
         endDate: exp.endDate || undefined,
         responsibilities: exp.responsibilities || [],
         achievements: exp.achievements || [],
+        links: exp.links || undefined,
         confidenceScore: exp.confidenceScore || 75,
       })),
       education: (parsedData.education || []).map((edu: any) => ({
@@ -209,6 +253,7 @@ export async function parseResumeWithAI(
         degree: edu.degree || "",
         graduationDate: edu.graduationDate || undefined,
         gpa: edu.gpa || undefined,
+        links: edu.links || undefined,
         confidenceScore: edu.confidenceScore || 75,
       })),
       skills: {
@@ -221,6 +266,8 @@ export async function parseResumeWithAI(
         description: proj.description || "",
         technologies: proj.technologies || [],
         url: proj.url || undefined,
+        demoUrl: proj.demoUrl || undefined,
+        repoUrl: proj.repoUrl || undefined,
         confidenceScore: proj.confidenceScore || 75,
       })),
       certifications: (parsedData.certifications || []).map((cert: any) => ({
@@ -228,6 +275,7 @@ export async function parseResumeWithAI(
         issuer: cert.issuer || "",
         issueDate: cert.issueDate || undefined,
         expirationDate: cert.expirationDate || undefined,
+        credentialUrl: cert.credentialUrl || undefined,
         confidenceScore: cert.confidenceScore || 75,
       })),
       languages: (parsedData.languages || []).map((lang: any) => ({
@@ -235,6 +283,11 @@ export async function parseResumeWithAI(
         proficiency: lang.proficiency || "Professional",
         confidenceScore: lang.confidenceScore || 75,
       })),
+      links: parsedData.links ? {
+        profiles: parsedData.links.profiles || [],
+        projects: parsedData.links.projects || [],
+        additional: parsedData.links.additional || [],
+      } : undefined,
       metadata: {
         ...metadata,
         processingTime,
@@ -427,30 +480,142 @@ Only return valid JSON.`;
 }
 
 /**
- * Import LinkedIn profile data from a URL (parses public profile)
+ * Check resume credibility - flags overlapping dates, unrealistic timelines, etc.
  */
-export async function importFromLinkedIn(linkedinUrl: string): Promise<Partial<ParsedResume>> {
+export async function checkCredibility(resume: ParsedResume): Promise<CredibilityResult> {
   const ai = getGeminiClient();
   
-  const prompt = `Given this LinkedIn URL: ${linkedinUrl}
+  const experienceDetails = resume.experience.map(e => ({
+    position: e.position,
+    company: e.company,
+    startDate: e.startDate,
+    endDate: e.endDate,
+    responsibilities: e.responsibilities.length,
+  }));
 
-I cannot access the URL directly, but based on the URL format, extract any information visible in the URL itself (like username).
+  const prompt = `You are a resume credibility analyst. Analyze this resume for potential red flags and inconsistencies.
 
-Since I cannot access external URLs, return a template structure that would need to be filled in:
+RESUME DATA:
+Name: ${resume.name}
+Total Experience Entries: ${resume.experience.length}
+Experience Timeline:
+${JSON.stringify(experienceDetails, null, 2)}
+
+Skills: ${[...resume.skills.technical, ...resume.skills.soft].join(", ")}
+
+Education:
+${resume.education.map(e => `${e.degree} from ${e.institution} (${e.graduationDate || 'N/A'})`).join("\n")}
+
+ANALYSIS REQUIREMENTS:
+1. Check for overlapping job dates
+2. Check for unrealistic career progression (e.g., junior to CEO in 2 years)
+3. Check for skill-experience mismatch (e.g., "10 years React" but only 3 years total experience)
+4. Check for employment gaps (not necessarily bad, just note them)
+5. Check if claimed expertise matches experience level
+6. Look for too many senior roles too quickly
+
+Return a JSON response:
 {
-  "name": "Extract from URL if possible or 'Unknown'",
-  "contactInfo": {
-    "linkedin": "${linkedinUrl}"
+  "credibilityScore": 0-100 (100 = highly credible, lower = more red flags),
+  "flags": [
+    {
+      "type": "overlapping_dates" | "unrealistic_timeline" | "skill_mismatch" | "rapid_progression" | "gap_detected" | "other",
+      "severity": "low" | "medium" | "high",
+      "message": "Brief description of the issue",
+      "details": "More context if needed"
+    }
+  ],
+  "timelineAnalysis": {
+    "totalYearsExperience": number,
+    "careerStartYear": number or null,
+    "averageTenure": number (average months per position),
+    "gaps": [
+      { "start": "YYYY-MM", "end": "YYYY-MM", "durationMonths": number }
+    ]
   },
-  "note": "LinkedIn data import requires the user to manually provide profile data or use LinkedIn's official API"
+  "overallAssessment": "Summary of credibility analysis - be fair and objective"
 }
 
-Return valid JSON only.`;
+IMPORTANT:
+- Be objective, not accusatory. These are flags for review, not accusations.
+- A gap is not a red flag by itself, just note it.
+- Some rapid progression is normal in fast-growing industries.
+- If the resume looks credible, give a high score and minimal flags.
+
+Only return valid JSON.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
-    config: { temperature: 0.1 },
+    config: { temperature: 0.2 },
+  });
+  
+  const text = response.text || "{}";
+  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
+  return JSON.parse(jsonMatch[1] || text);
+}
+
+/**
+ * Quantify impact - improve weak resume bullets with metrics and strong verbs
+ */
+export async function quantifyImpact(resume: ParsedResume): Promise<ImpactQuantificationResult> {
+  const ai = getGeminiClient();
+  
+  // Collect all bullet points from experience
+  const allBullets: string[] = [];
+  resume.experience.forEach(exp => {
+    allBullets.push(...exp.responsibilities);
+    allBullets.push(...exp.achievements);
+  });
+
+  const prompt = `You are an expert resume writer. Analyze these resume bullet points and identify weak ones that lack impact, metrics, or strong action verbs.
+
+BULLET POINTS TO ANALYZE:
+${allBullets.map((b, i) => `${i + 1}. ${b}`).join("\n")}
+
+WEAK BULLET INDICATORS:
+- Vague verbs: "worked on", "helped with", "was responsible for", "assisted"
+- No quantifiable results
+- Missing context or scope
+- Passive voice
+- No mention of impact or outcomes
+
+YOUR TASK:
+1. Identify weak bullets
+2. Rewrite each weak bullet to be stronger with:
+   - Strong action verbs (Led, Developed, Implemented, Increased, Reduced, etc.)
+   - Quantifiable metrics when possible (%, $, numbers)
+   - Clear context and impact
+   - If metrics aren't available, suggest placeholders like "X%" or "[number]"
+
+Return a JSON response:
+{
+  "weakBulletsCount": number of bullets that need improvement,
+  "improvedBullets": [
+    {
+      "original": "the original weak bullet",
+      "improved": "the stronger rewritten version",
+      "improvementType": "added_metrics" | "stronger_verbs" | "added_context" | "quantified_results" | "clarified_impact",
+      "confidenceScore": 0-100 (how confident you are in this improvement)
+    }
+  ],
+  "overallImpactScore": 0-100 (how impactful the resume bullets are overall),
+  "suggestions": ["general tips for improving resume impact"]
+}
+
+EXAMPLES OF IMPROVEMENTS:
+Original: "Worked on backend APIs"
+Improved: "Developed RESTful APIs serving 20K+ daily requests, reducing response time by 35%"
+
+Original: "Helped with customer issues"
+Improved: "Resolved 50+ customer support tickets weekly, achieving 98% satisfaction rating"
+
+Only return valid JSON.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+    config: { temperature: 0.3 },
   });
   
   const text = response.text || "{}";
