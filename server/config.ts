@@ -1,6 +1,70 @@
 import dotenv from "dotenv";
+import { createModuleLogger } from "./utils/logger";
 
 // Load environment variables from .env file
 dotenv.config();
 
-export {};
+const logger = createModuleLogger("Config");
+
+/**
+ * Validate required environment variables on startup
+ */
+export function validateEnvironment(): void {
+  const required = [
+    "DATABASE_URL",
+    "GEMINI_API_KEY",
+    "SESSION_SECRET",
+  ];
+
+  const optional = [
+    "GROQ_API_KEY",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_USER",
+    "SMTP_PASS",
+  ];
+
+  const missing: string[] = [];
+  const warnings: string[] = [];
+
+  // Check required variables
+  for (const key of required) {
+    if (!process.env[key]) {
+      missing.push(key);
+    }
+  }
+
+  // Check optional but recommended variables
+  if (!process.env.GROQ_API_KEY) {
+    warnings.push("GROQ_API_KEY (fallback won't work if Gemini quota is hit)");
+  }
+
+  if (missing.length > 0) {
+    logger.error("Missing required environment variables:");
+    missing.forEach(key => logger.error(`  - ${key}`));
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}\n` +
+      "Please check your .env file or environment configuration."
+    );
+  }
+
+  if (warnings.length > 0) {
+    logger.warn("Optional environment variables not set:");
+    warnings.forEach(msg => logger.warn(`  - ${msg}`));
+  }
+
+  // Validate DATABASE_URL format
+  if (process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith("postgresql://")) {
+    logger.warn("DATABASE_URL should start with 'postgresql://'");
+  }
+
+  // Validate PORT
+  const port = parseInt(process.env.PORT || "5000", 10);
+  if (isNaN(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid PORT: ${process.env.PORT}. Must be between 1 and 65535.`);
+  }
+
+  logger.info("Environment validation passed");
+  logger.info(`Server will run on port ${port}`);
+  logger.info(`Node environment: ${process.env.NODE_ENV || "development"}`);
+}

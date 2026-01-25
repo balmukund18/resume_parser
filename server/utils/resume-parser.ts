@@ -1,5 +1,6 @@
-import { GoogleGenAI } from "@google/genai";
 import { createModuleLogger } from "./logger";
+import { generateContentWithFallback } from "./ai-client";
+import type { ExtractedLink } from "./text-extractor";
 import type { 
   ParsedResume, Metadata, SkillsGapResult, ResumeScoreResult, 
   JobMatchResult, KeywordOptimization, CredibilityResult, ImpactQuantificationResult 
@@ -7,142 +8,234 @@ import type {
 
 const logger = createModuleLogger("ResumeParser");
 
-// Initialize Gemini client - supports both user API key and Replit AI Integrations
-function getGeminiClient(): GoogleGenAI {
-  // First check for user's own API key
-  if (process.env.GEMINI_API_KEY) {
-    logger.info("Using user-provided GEMINI_API_KEY");
-    return new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
-    });
-  }
-  
-  // Fall back to Replit AI Integrations
-  if (process.env.AI_INTEGRATIONS_GEMINI_API_KEY) {
-    logger.info("Using Replit AI Integrations");
-    return new GoogleGenAI({
-      apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-      httpOptions: {
-        apiVersion: "",
-        baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-      },
-    });
-  }
-  
-  throw new Error("No Gemini API key configured. Set GEMINI_API_KEY environment variable.");
-}
+const RESUME_PARSING_PROMPT = `You are an expert resume-parsing and document-analysis AI with deep knowledge of resume formats, industry standards, and data extraction best practices.
 
-const RESUME_PARSING_PROMPT = `You are an expert resume-parsing and document-analysis AI.
+Your task is to analyze the provided resume text and extract structured, accurate information with high precision.
 
-Analyze the following resume text and extract structured information. 
+## CRITICAL REQUIREMENTS
 
-CRITICAL: LINK EXTRACTION IS A FIRST-CLASS FEATURE
-Extract EVERY link found in the document, including:
-- Visible URLs written as text
-- Embedded or hidden hyperlinks (anchor text with URL)
-- Shortened or masked links
-- Profile links: LinkedIn, GitHub, LeetCode, Codeforces, HackerRank, Kaggle, Portfolio, Personal Website
-- Project links: Live demos, GitHub repos, deployed apps, documentation
-- Experience links: Company websites, product pages, tools, platforms
-- Education links: Institution websites, course pages, certificates
-- Certification links: Credential verification or issuer links
+### 1. HYPERLINK EXTRACTION (FIRST-CLASS FEATURE)
+I will provide you with:
+- Resume text content
+- Extracted hyperlinks with anchor text, URLs, and section context
 
-Return a JSON object with the following structure:
+You MUST extract and categorize EVERY link:
+- **Profile Links**: LinkedIn, GitHub, LeetCode, Codeforces, HackerRank, Kaggle, Portfolio, Personal Website, Twitter/X, Medium, Dev.to, Stack Overflow, Behance, Dribbble
+- **Project Links**: Live demos, GitHub repos, deployed apps, documentation, case studies
+- **Experience Links**: Company websites, product pages, tools, platforms, press releases
+- **Education Links**: Institution websites, course pages, certificates, transcripts
+- **Certification Links**: Credential verification URLs, issuer websites, badge links
+
+**PRIORITY**: Use the provided extracted hyperlinks (they have accurate anchor text and section context) over URLs found in plain text.
+
+### 2. ACCURACY PRINCIPLES
+- Extract ONLY information explicitly present in the resume
+- Do NOT infer, assume, or hallucinate data
+- If information is ambiguous, use null or mark with lower confidence
+- Preserve exact wording for names, titles, and companies
+- Normalize dates to consistent formats (YYYY-MM-DD, YYYY-MM, or YYYY)
+- Deduplicate skills, experiences, and other entries
+
+### 3. DATE PARSING RULES
+- Parse dates in various formats: "Jan 2020", "January 2020", "01/2020", "2020-01", "2020"
+- Convert relative dates: "Present" → "Present", "Current" → "Present"
+- Handle partial dates: "2020" → "2020", "Jan 2020" → "2020-01"
+- If only year is available, use YYYY format
+- If month and year, use YYYY-MM format
+- If full date, use YYYY-MM-DD format
+- For ongoing positions, use "Present" as endDate
+
+### 4. SKILL EXTRACTION GUIDELINES
+- **Technical Skills**: Programming languages, frameworks, tools, platforms, methodologies, databases, cloud services, APIs, libraries
+- **Soft Skills**: Communication, leadership, teamwork, problem-solving, time management, adaptability, creativity
+- Extract skills from multiple sections: Skills section, Experience descriptions, Projects, Certifications
+- Normalize skill names (e.g., "JS" → "JavaScript", "React.js" → "React")
+- Group related skills (e.g., "AWS", "Amazon Web Services" → "AWS")
+- Remove duplicates and variations`;
+
+const RESUME_JSON_SCHEMA = `
+## OUTPUT FORMAT (Strict JSON Schema)
+
+You must return a valid JSON object matching this exact structure:
+
 {
-  "name": "Full name of the candidate",
+  "name": "Full legal name of the candidate (extract from header/contact section)",
   "contactInfo": {
-    "email": "Email address or null",
-    "phone": "Phone number or null",
-    "address": "Location/address or null",
-    "linkedin": "LinkedIn URL or null",
-    "github": "GitHub URL or null",
+    "email": "Primary email address (normalize to lowercase) or null",
+    "phone": "Phone number in international format if possible, or as written, or null",
+    "address": "Full address, city/state, or location (as written) or null",
+    "linkedin": "Full LinkedIn profile URL (normalize to https://) or null",
+    "github": "Full GitHub profile URL (normalize to https://) or null",
     "portfolio": "Portfolio/personal website URL or null",
-    "leetcode": "LeetCode URL or null",
-    "hackerrank": "HackerRank URL or null",
-    "kaggle": "Kaggle URL or null",
-    "codeforces": "Codeforces URL or null",
-    "twitter": "Twitter/X URL or null",
-    "otherProfiles": ["Array of other profile URLs"]
+    "leetcode": "LeetCode profile URL or null",
+    "hackerrank": "HackerRank profile URL or null",
+    "kaggle": "Kaggle profile URL or null",
+    "codeforces": "Codeforces profile URL or null",
+    "twitter": "Twitter/X profile URL or null",
+    "otherProfiles": ["Array of other profile URLs (Medium, Dev.to, Stack Overflow, etc.)"]
   },
-  "summary": "Professional summary or objective text or null",
+  "summary": "Professional summary, objective, or profile statement (preserve original wording) or null",
   "experience": [
     {
-      "company": "Company name",
-      "position": "Job title",
-      "startDate": "Start date (YYYY-MM or YYYY format) or null",
-      "endDate": "End date or 'Present' or null",
-      "responsibilities": ["List of job responsibilities"],
-      "achievements": ["Notable achievements"],
-      "links": ["Any URLs mentioned in this experience entry"],
-      "confidenceScore": 0-100
+      "company": "Exact company name as written",
+      "position": "Exact job title as written",
+      "startDate": "Start date in YYYY-MM-DD, YYYY-MM, or YYYY format, or null",
+      "endDate": "End date in same format, or 'Present' for current role, or null",
+      "responsibilities": ["Array of job responsibilities/bullet points (preserve original wording)"],
+      "achievements": ["Array of notable achievements, metrics, awards (preserve original wording)"],
+      "links": ["Array of URLs related to this experience (company website, products, tools)"],
+      "confidenceScore": 0-100 (confidence in accuracy of this entry)
     }
   ],
   "education": [
     {
-      "institution": "School/University name",
-      "degree": "Degree title",
-      "graduationDate": "Graduation date or null",
-      "gpa": GPA as number or null,
-      "links": ["Institution website, course links, etc."],
+      "institution": "Full institution name as written",
+      "degree": "Complete degree title (e.g., 'Bachelor of Science in Computer Science')",
+      "graduationDate": "Graduation date in YYYY-MM-DD, YYYY-MM, or YYYY format, or null",
+      "gpa": GPA as number (e.g., 3.8) or null if not mentioned,
+      "links": ["Array of URLs (institution website, course pages, certificates)"],
       "confidenceScore": 0-100
     }
   ],
   "skills": {
-    "technical": ["List of technical/hard skills"],
-    "soft": ["List of soft skills"],
+    "technical": ["Array of technical/hard skills (normalize variations, remove duplicates)"],
+    "soft": ["Array of soft/interpersonal skills"],
     "confidenceScore": 0-100
   },
   "projects": [
     {
-      "name": "Project name",
-      "description": "Brief description",
-      "technologies": ["Technologies used"],
-      "url": "Project URL or null",
+      "name": "Project name as written",
+      "description": "Project description (preserve key details)",
+      "technologies": ["Array of technologies, frameworks, tools used"],
+      "url": "Main project URL or null",
       "demoUrl": "Live demo URL or null",
-      "repoUrl": "GitHub/repo URL or null",
+      "repoUrl": "GitHub/repository URL or null",
       "confidenceScore": 0-100
     }
   ],
   "certifications": [
     {
-      "name": "Certification name",
-      "issuer": "Issuing organization",
-      "issueDate": "Issue date or null",
-      "expirationDate": "Expiration date or null",
+      "name": "Full certification name",
+      "issuer": "Issuing organization (e.g., 'Amazon Web Services', 'Google Cloud')",
+      "issueDate": "Issue date in YYYY-MM-DD, YYYY-MM, or YYYY format, or null",
+      "expirationDate": "Expiration date in same format, or null if not applicable",
       "credentialUrl": "Verification/credential URL or null",
       "confidenceScore": 0-100
     }
   ],
   "languages": [
     {
-      "language": "Language name",
-      "proficiency": "Proficiency level (Native, Fluent, Professional, Basic)",
+      "language": "Language name (e.g., 'English', 'Spanish', 'Mandarin Chinese')",
+      "proficiency": "Proficiency level: 'Native', 'Fluent', 'Professional', 'Conversational', or 'Basic'",
       "confidenceScore": 0-100
     }
   ],
   "links": {
-    "profiles": [{"url": "URL", "anchorText": "text or null", "platform": "LinkedIn/GitHub/etc", "confidenceScore": 0-100}],
-    "projects": [{"url": "URL", "anchorText": "text or null", "projectName": "if identifiable", "confidenceScore": 0-100}],
-    "additional": [{"url": "URL", "anchorText": "text or null", "context": "where found", "confidenceScore": 0-100}]
+    "profiles": [
+      {
+        "url": "Full URL (normalize to https://)",
+        "anchorText": "Anchor text from hyperlink or null",
+        "platform": "Platform name (LinkedIn/GitHub/LeetCode/HackerRank/Kaggle/Codeforces/Portfolio/Twitter/Medium/etc)",
+        "confidenceScore": 0-100
+      }
+    ],
+    "projects": [
+      {
+        "url": "Full URL",
+        "anchorText": "Anchor text or null",
+        "projectName": "Project name if identifiable from context, or null",
+        "confidenceScore": 0-100
+      }
+    ],
+    "additional": [
+      {
+        "url": "Full URL",
+        "anchorText": "Anchor text or null",
+        "context": "Where found (e.g., 'experience at Company X', 'education section', 'certification')",
+        "confidenceScore": 0-100
+      }
+    ]
   },
-  "detectedLanguage": "en or es (detected language of resume)"
+  "detectedLanguage": "Language code: 'en' for English, 'es' for Spanish, or other ISO 639-1 codes"
 }
 
-Confidence scores should reflect how certain you are about the extracted data:
-- 90-100: High confidence - clearly stated in resume
-- 70-89: Medium confidence - inferred from context
-- Below 70: Low confidence - uncertain or ambiguous
+## HYPERLINK PROCESSING INSTRUCTIONS
 
-IMPORTANT:
-- If information is not found, use null for optional fields or empty arrays for lists
-- Dates should be in YYYY-MM-DD or YYYY-MM or YYYY format when possible
-- Extract as much relevant information as possible
-- Be thorough but accurate - only include information that is clearly in the resume
-- Deduplicate links and normalize URLs (use https, remove tracking parameters)
-- Do NOT hallucinate or infer links that are not explicitly present
-- Link extraction must be treated as a FIRST-CLASS feature - missing links is a parsing failure
+### Step 1: Section-Specific Link Placement
+Place links in their relevant sections FIRST:
+- **Experience links** → experience[].links array (company websites, product pages, tools, platforms)
+- **Education links** → education[].links array (institution websites, course pages, certificates)
+- **Project URLs** → projects array with url (main), demoUrl (live demo), repoUrl (source code)
+- **Certification links** → certifications[].credentialUrl (verification URLs)
+- **Profile links** → contactInfo fields (linkedin, github, portfolio, etc.)
 
-RESUME TEXT:
+### Step 2: Comprehensive Links Section
+ALSO include ALL links in the main links object:
+- **profiles**: All social/professional profiles (LinkedIn, GitHub, LeetCode, etc.)
+- **projects**: All project-related links (demos, repos, documentation)
+- **additional**: All other links with context about where they were found
+
+### Step 3: Link Processing Priority
+1. **First**: Use extracted hyperlinks provided below (they have accurate anchor text and section context)
+2. **Second**: Match links to sections based on the 'section' field from extracted hyperlinks
+3. **Third**: Extract any additional visible URLs from resume text
+4. **Fourth**: Ensure every link appears in BOTH its relevant section AND the comprehensive links object
+
+### Step 4: Section Context Mapping
+Use the 'section' field from extracted hyperlinks:
+- link.section = 'experience' → Add to relevant experience[].links
+- link.section = 'education' → Add to relevant education[].links
+- link.section = 'projects' → Add to projects array url, demoUrl, or repoUrl fields
+- link.section = 'certifications' → Add to certifications[].credentialUrl
+- link.section = 'contact' → Add to contactInfo fields
+
+### Step 5: URL Normalization
+- Convert all URLs to HTTPS
+- Remove tracking parameters (utm_*, ref=, etc.)
+- Remove trailing slashes
+- Deduplicate identical URLs
+- Preserve anchor text when available
+
+## CONFIDENCE SCORING GUIDELINES
+
+Assign confidence scores (0-100) based on certainty:
+- **90-100 (High)**: Information is explicitly stated, clear, and unambiguous
+- **70-89 (Medium)**: Information is inferred from context but reasonably certain
+- **50-69 (Low-Medium)**: Information is somewhat ambiguous or partially inferred
+- **Below 50 (Low)**: Information is uncertain, highly inferred, or potentially incorrect
+
+Apply confidence scores to:
+- Each experience entry
+- Each education entry
+- Skills section overall
+- Each project
+- Each certification
+- Each language
+- Each link
+
+## CRITICAL RULES
+
+1. **Accuracy First**: Extract ONLY information explicitly present. Do NOT infer or assume.
+2. **Null vs Empty**: Use null for missing optional fields, empty arrays [] for missing lists
+3. **Date Formats**: Normalize to YYYY-MM-DD, YYYY-MM, or YYYY (prefer most specific format available)
+4. **Name Preservation**: Preserve exact wording for names, titles, companies, institutions
+5. **Deduplication**: Remove duplicate skills, experiences, projects, certifications
+6. **Link Extraction**: Missing links is a parsing failure - extract ALL links
+7. **No Hallucination**: Do NOT create links, skills, or experiences that aren't in the resume
+8. **Language Detection**: Detect primary language (en, es, fr, de, etc.) based on content
+
+## OUTPUT REQUIREMENTS
+
+- Return ONLY valid JSON (no markdown, no code blocks, no explanations)
+- Ensure all required fields are present
+- Use proper JSON escaping for special characters
+- Maintain consistent date formats throughout
+- Normalize all URLs to HTTPS
+- Preserve original wording in descriptions and summaries
+
+---
+
+## RESUME TEXT TO ANALYZE:
 `;
 
 export interface ParseResult {
@@ -155,17 +248,30 @@ export interface ParseResult {
  */
 export async function parseResumeWithAI(
   text: string,
+  extractedLinks: ExtractedLink[],
   metadata: Omit<Metadata, "processingTime" | "overallConfidence" | "language">
 ): Promise<ParseResult> {
   const startTime = Date.now();
   logger.info("Starting AI resume parsing");
   
-  const ai = getGeminiClient();
+  // Prepare hyperlinks context
+  let hyperlinkContext = "\n\nEXTRACTED HYPERLINKS:\n";
+  if (extractedLinks.length > 0) {
+    hyperlinkContext += extractedLinks.map((link, i) => 
+      `${i + 1}. Text: "${link.text}" -> URL: ${link.url} (${link.context || 'Document'})`
+    ).join('\n');
+    logger.info(`Processing ${extractedLinks.length} extracted hyperlinks`);
+  } else {
+    hyperlinkContext += "No embedded hyperlinks found in document.\n";
+  }
+  
+  hyperlinkContext += "\nRESUME TEXT:\n";
   
   try {
-    const response = await ai.models.generateContent({
+    const fullPrompt = RESUME_PARSING_PROMPT + RESUME_JSON_SCHEMA + hyperlinkContext + text;
+    const response = await generateContentWithFallback({
       model: "gemini-2.5-flash",
-      contents: RESUME_PARSING_PROMPT + text,
+      contents: fullPrompt,
       config: {
         maxOutputTokens: 8192,
         temperature: 0.1,
@@ -173,7 +279,7 @@ export async function parseResumeWithAI(
     });
     
     const responseText = response.text || "";
-    logger.info(`Received response from Gemini (${responseText.length} chars)`);
+    logger.info(`Received response from ${response.provider} (${responseText.length} chars)`);
     
     // Extract JSON from response
     let jsonStr = responseText;
@@ -311,30 +417,70 @@ export async function analyzeSkillsGap(
   resumeSkills: { technical: string[]; soft: string[] },
   jobDescription: { title: string; description: string; requiredSkills?: string[] }
 ): Promise<SkillsGapResult> {
-  const ai = getGeminiClient();
-  
-  const prompt = `Analyze the skills gap between a candidate's resume and a job description.
+  const prompt = `You are an expert recruiter and career advisor analyzing the skills gap between a candidate's resume and a job description.
 
-CANDIDATE SKILLS:
-Technical: ${resumeSkills.technical.join(", ")}
-Soft Skills: ${resumeSkills.soft.join(", ")}
+## TASK
+Perform a comprehensive skills gap analysis to determine:
+1. How well the candidate matches the job requirements
+2. Which skills the candidate already has
+3. Which critical skills are missing
+4. Actionable recommendations to improve the match
 
-JOB DESCRIPTION:
-Title: ${jobDescription.title}
-Description: ${jobDescription.description}
-${jobDescription.requiredSkills ? `Required Skills: ${jobDescription.requiredSkills.join(", ")}` : ""}
+## CANDIDATE SKILLS
+**Technical Skills:** ${resumeSkills.technical.length > 0 ? resumeSkills.technical.join(", ") : "None listed"}
+**Soft Skills:** ${resumeSkills.soft.length > 0 ? resumeSkills.soft.join(", ") : "None listed"}
 
-Provide a JSON response with:
+## JOB DESCRIPTION
+**Job Title:** ${jobDescription.title}
+**Job Description:** ${jobDescription.description}
+${jobDescription.requiredSkills ? `**Required Skills:** ${jobDescription.requiredSkills.join(", ")}` : ""}
+
+## ANALYSIS INSTRUCTIONS
+
+1. **Extract Required Skills**: Identify all skills mentioned in the job description (both explicit and implicit)
+   - Technical skills: programming languages, frameworks, tools, platforms, methodologies
+   - Soft skills: communication, leadership, teamwork, problem-solving, etc.
+   - Domain knowledge: industry-specific knowledge, regulations, standards
+
+2. **Match Skills**: Compare candidate skills with job requirements
+   - Consider variations (e.g., "JS" = "JavaScript", "React.js" = "React")
+   - Consider related skills (e.g., "AWS" includes knowledge of cloud computing)
+   - Be fair but thorough
+
+3. **Calculate Match Score**: 
+   - 90-100: Excellent match - candidate has most/all required skills
+   - 70-89: Good match - candidate has core skills, missing some advanced/preferred
+   - 50-69: Moderate match - candidate has some skills but missing key requirements
+   - Below 50: Poor match - significant skills gap
+
+4. **Identify Missing Skills**: List skills that are:
+   - Explicitly required in the job description
+   - Implicitly necessary based on the role
+   - Preferred/desirable skills that would strengthen the application
+
+5. **Provide Recommendations**: Give specific, actionable advice:
+   - Which skills to learn/improve (prioritized by importance)
+   - How to gain these skills (courses, projects, certifications)
+   - How to highlight transferable skills
+   - How to frame existing experience to match requirements
+
+## OUTPUT FORMAT
+Return ONLY valid JSON (no markdown, no explanations):
+
 {
-  "matchScore": 0-100 (how well the candidate matches),
-  "matchingSkills": ["skills the candidate has that match the job"],
-  "missingSkills": ["skills the job requires that the candidate lacks"],
-  "recommendations": ["specific actionable advice to improve the match"]
+  "matchScore": 0-100,
+  "matchingSkills": ["array of skills candidate has that match job requirements"],
+  "missingSkills": ["array of skills job requires that candidate lacks (prioritized by importance)"],
+  "recommendations": [
+    "Specific, actionable recommendation 1",
+    "Specific, actionable recommendation 2",
+    "..."
+  ]
 }
 
-Be thorough and specific. Only return valid JSON.`;
+Be thorough, specific, and constructive. Only return valid JSON.`;
 
-  const response = await ai.models.generateContent({
+  const response = await generateContentWithFallback({
     model: "gemini-2.5-flash",
     contents: prompt,
     config: { temperature: 0.2 },
@@ -349,38 +495,112 @@ Be thorough and specific. Only return valid JSON.`;
  * Score a resume based on completeness and quality
  */
 export async function scoreResume(resume: ParsedResume): Promise<ResumeScoreResult> {
-  const ai = getGeminiClient();
-  
-  const prompt = `Score this resume on various criteria. Be critical but fair.
+  const experienceDetails = resume.experience.map(e => ({
+    position: e.position,
+    company: e.company,
+    duration: e.startDate && e.endDate ? `${e.startDate} to ${e.endDate}` : "Dates not specified",
+    responsibilities: e.responsibilities.length,
+    achievements: e.achievements.length,
+    hasMetrics: e.achievements.some(a => /\d+%|\$|\d+\+/.test(a)) || e.responsibilities.some(r => /\d+%|\$|\d+\+/.test(r))
+  }));
 
-RESUME DATA:
-Name: ${resume.name}
-Summary: ${resume.summary || "Not provided"}
-Experience: ${resume.experience.length} positions
-Education: ${resume.education.length} entries
-Technical Skills: ${resume.skills.technical.join(", ") || "None listed"}
-Soft Skills: ${resume.skills.soft.join(", ") || "None listed"}
-Projects: ${resume.projects.length} projects
-Certifications: ${resume.certifications.length} certifications
+  const prompt = `You are an expert resume reviewer and career coach. Evaluate this resume comprehensively and provide detailed scoring and feedback.
 
-Experience Details:
-${resume.experience.map(e => `- ${e.position} at ${e.company}: ${e.responsibilities.length} responsibilities, ${e.achievements.length} achievements`).join("\n")}
+## RESUME OVERVIEW
+**Name:** ${resume.name}
+**Summary/Objective:** ${resume.summary || "Not provided"}
+**Total Experience Entries:** ${resume.experience.length}
+**Education Entries:** ${resume.education.length}
+**Technical Skills Count:** ${resume.skills.technical.length}
+**Soft Skills Count:** ${resume.skills.soft.length}
+**Projects:** ${resume.projects.length}
+**Certifications:** ${resume.certifications.length}
+**Languages:** ${resume.languages?.length || 0}
 
-Provide a JSON response with scores from 0-100:
+## EXPERIENCE DETAILS
+${JSON.stringify(experienceDetails, null, 2)}
+
+## TECHNICAL SKILLS
+${resume.skills.technical.length > 0 ? resume.skills.technical.join(", ") : "None listed"}
+
+## SOFT SKILLS
+${resume.skills.soft.length > 0 ? resume.skills.soft.join(", ") : "None listed"}
+
+## SCORING CRITERIA
+
+Evaluate each aspect on a scale of 0-100:
+
+1. **Completeness Score (0-100)**
+   - All major sections present (contact, summary, experience, education, skills)
+   - Each section has sufficient detail
+   - No critical information missing
+   - Professional summary/objective provided
+
+2. **Keyword Score (0-100)**
+   - Industry-relevant keywords present
+   - ATS-friendly terminology
+   - Appropriate technical jargon
+   - Action verbs used effectively
+
+3. **Formatting Score (0-100)**
+   - Well-structured data (implies good formatting)
+   - Consistent date formats
+   - Clear section organization
+   - Professional presentation
+
+4. **Experience Score (0-100)**
+   - Relevance and quality of positions
+   - Quantifiable achievements present
+   - Clear progression/advancement
+   - Appropriate level of detail
+   - Strong action verbs and impact statements
+
+5. **Education Score (0-100)**
+   - Relevance of education to career
+   - Prestigious institutions (if applicable)
+   - Additional credentials (certifications, courses)
+   - GPA mentioned (if strong)
+
+6. **Skills Score (0-100)**
+   - Breadth and depth of technical skills
+   - Balance of hard and soft skills
+   - Relevance to target industry
+   - Modern/current technologies
+   - Skill diversity
+
+7. **Overall Score (0-100)**
+   - Weighted average: Experience (30%), Skills (25%), Completeness (20%), Keywords (15%), Education (10%)
+
+## FEEDBACK REQUIREMENTS
+
+Provide specific, actionable suggestions:
+- What's missing or weak
+- How to improve each section
+- Industry best practices to follow
+- Common mistakes to avoid
+- Prioritized recommendations
+
+## OUTPUT FORMAT
+Return ONLY valid JSON:
+
 {
-  "overallScore": weighted average of all scores,
-  "completenessScore": how complete is the resume (all sections filled),
-  "keywordScore": industry-relevant keywords present,
-  "formattingScore": implied structure quality based on data,
-  "experienceScore": quality and relevance of experience,
-  "educationScore": education quality and relevance,
-  "skillsScore": breadth and depth of skills,
-  "suggestions": ["specific improvements the candidate should make"]
+  "overallScore": 0-100,
+  "completenessScore": 0-100,
+  "keywordScore": 0-100,
+  "formattingScore": 0-100,
+  "experienceScore": 0-100,
+  "educationScore": 0-100,
+  "skillsScore": 0-100,
+  "suggestions": [
+    "Specific, prioritized improvement suggestion 1",
+    "Specific, prioritized improvement suggestion 2",
+    "..."
+  ]
 }
 
-Only return valid JSON.`;
+Be critical but constructive. Only return valid JSON.`;
 
-  const response = await ai.models.generateContent({
+  const response = await generateContentWithFallback({
     model: "gemini-2.5-flash",
     contents: prompt,
     config: { temperature: 0.2 },
@@ -398,33 +618,80 @@ export async function matchResumeToJob(
   resume: ParsedResume,
   jobDescription: { title: string; company?: string; description: string }
 ): Promise<JobMatchResult> {
-  const ai = getGeminiClient();
-  
-  const prompt = `Evaluate how well this candidate matches the job.
+  const experienceSummary = resume.experience.map(e => 
+    `${e.position} at ${e.company}${e.startDate ? ` (${e.startDate}${e.endDate ? ` - ${e.endDate}` : " - Present"})` : ""}`
+  ).join("; ");
 
-CANDIDATE:
-Name: ${resume.name}
-Experience: ${resume.experience.map(e => `${e.position} at ${e.company}`).join("; ")}
-Education: ${resume.education.map(e => `${e.degree} from ${e.institution}`).join("; ")}
-Skills: ${[...resume.skills.technical, ...resume.skills.soft].join(", ")}
+  const prompt = `You are an expert recruiter evaluating how well a candidate matches a job position. Perform a comprehensive match analysis.
 
-JOB:
-Title: ${jobDescription.title}
-${jobDescription.company ? `Company: ${jobDescription.company}` : ""}
-Description: ${jobDescription.description}
+## CANDIDATE PROFILE
+**Name:** ${resume.name}
+**Summary:** ${resume.summary || "Not provided"}
+**Total Experience:** ${resume.experience.length} position(s)
+**Experience History:** ${experienceSummary || "No experience listed"}
+**Education:** ${resume.education.map(e => `${e.degree} from ${e.institution}${e.graduationDate ? ` (${e.graduationDate})` : ""}`).join("; ") || "Not provided"}
+**Technical Skills:** ${resume.skills.technical.length > 0 ? resume.skills.technical.join(", ") : "None listed"}
+**Soft Skills:** ${resume.skills.soft.length > 0 ? resume.skills.soft.join(", ") : "None listed"}
+**Projects:** ${resume.projects.length} project(s)
+**Certifications:** ${resume.certifications.length} certification(s)
 
-Provide a JSON response:
+## JOB REQUIREMENTS
+**Job Title:** ${jobDescription.title}
+${jobDescription.company ? `**Company:** ${jobDescription.company}` : ""}
+**Job Description:** ${jobDescription.description}
+
+## MATCH ANALYSIS INSTRUCTIONS
+
+Evaluate the candidate across multiple dimensions:
+
+1. **Skills Match (0-100)**
+   - Compare candidate's technical and soft skills with job requirements
+   - Consider skill depth, relevance, and currency
+   - Weight required skills higher than preferred skills
+   - Consider transferable skills
+
+2. **Experience Match (0-100)**
+   - Relevance of past roles to the target position
+   - Years of experience vs. requirements
+   - Industry experience alignment
+   - Career progression and advancement
+   - Achievements and impact in similar roles
+
+3. **Education Match (0-100)**
+   - Degree relevance to job requirements
+   - Institution reputation (if relevant)
+   - Additional credentials (certifications, courses)
+   - Continuous learning indicators
+
+4. **Overall Match Score (0-100)**
+   - Weighted combination: Skills (40%), Experience (40%), Education (20%)
+   - Consider both hard requirements and soft factors
+   - Be realistic but fair
+
+5. **Match Reasons**
+   - Specific strengths that make them a good fit
+   - Specific gaps or concerns
+   - Transferable skills or experiences
+   - Potential for growth/learning curve
+
+## OUTPUT FORMAT
+Return ONLY valid JSON:
+
 {
-  "matchScore": 0-100 (overall match percentage),
-  "skillsMatch": 0-100 (how well skills align),
-  "experienceMatch": 0-100 (how relevant is their experience),
-  "educationMatch": 0-100 (education fit),
-  "reasons": ["specific reasons why they are/aren't a good match"]
+  "matchScore": 0-100,
+  "skillsMatch": 0-100,
+  "experienceMatch": 0-100,
+  "educationMatch": 0-100,
+  "reasons": [
+    "Specific reason 1 (strength or gap)",
+    "Specific reason 2",
+    "..."
+  ]
 }
 
-Only return valid JSON.`;
+Be thorough, specific, and objective. Only return valid JSON.`;
 
-  const response = await ai.models.generateContent({
+  const response = await generateContentWithFallback({
     model: "gemini-2.5-flash",
     contents: prompt,
     config: { temperature: 0.2 },
@@ -442,33 +709,89 @@ export async function optimizeKeywords(
   resume: ParsedResume,
   targetJobDescription?: { title: string; description: string }
 ): Promise<KeywordOptimization> {
-  const ai = getGeminiClient();
-  
   const jobContext = targetJobDescription 
-    ? `\nTARGET JOB:\nTitle: ${targetJobDescription.title}\nDescription: ${targetJobDescription.description}`
-    : "\nNo specific job target - provide general ATS optimization.";
-  
-  const prompt = `Analyze this resume for ATS (Applicant Tracking System) optimization.
+    ? `## TARGET JOB
+**Title:** ${targetJobDescription.title}
+**Description:** ${targetJobDescription.description}
 
-RESUME:
-Name: ${resume.name}
-Summary: ${resume.summary || "Not provided"}
-Skills: ${[...resume.skills.technical, ...resume.skills.soft].join(", ")}
-Experience: ${resume.experience.map(e => `${e.position}: ${e.responsibilities.slice(0, 3).join(", ")}`).join("; ")}
+**Analysis Focus:** Optimize resume keywords to match this specific job posting.`
+    : `## GENERAL ATS OPTIMIZATION
+**Analysis Focus:** Provide general ATS optimization recommendations for better visibility across job postings.`;
+  
+  const prompt = `You are an ATS (Applicant Tracking System) optimization expert. Analyze this resume for keyword optimization and ATS compatibility.
+
+## RESUME CONTENT
+**Name:** ${resume.name}
+**Summary/Objective:** ${resume.summary || "Not provided"}
+**Technical Skills:** ${resume.skills.technical.join(", ") || "None"}
+**Soft Skills:** ${resume.skills.soft.join(", ") || "None"}
+**Experience Positions:** ${resume.experience.length}
+**Projects:** ${resume.projects.length}
+**Certifications:** ${resume.certifications.length}
+
+**Experience Highlights:**
+${resume.experience.map((e, i) => `${i + 1}. ${e.position} at ${e.company}\n   Responsibilities: ${e.responsibilities.slice(0, 2).join("; ")}`).join("\n")}
+
 ${jobContext}
 
-Provide a JSON response:
+## ATS OPTIMIZATION ANALYSIS
+
+### 1. Existing Keywords Analysis
+Identify keywords already present that are:
+- ATS-friendly (common industry terms)
+- Action verbs (Led, Developed, Implemented, etc.)
+- Technical terms relevant to the field
+- Industry-standard terminology
+- Quantifiable metrics and achievements
+
+### 2. Missing Keywords Analysis
+Identify important keywords that are:
+- Mentioned in job description (if provided)
+- Industry-standard terms for the role
+- Common ATS search terms
+- Skills/technologies expected for the position
+- Certifications or credentials relevant to the field
+
+### 3. Suggested Phrases
+Provide specific phrases the candidate should add:
+- Action verb + achievement combinations
+- Industry-specific terminology
+- Quantifiable impact statements
+- Skill + context combinations
+- Certification mentions
+
+### 4. ATS Score Calculation
+Rate ATS compatibility (0-100) based on:
+- Keyword density and relevance
+- Action verb usage
+- Quantifiable achievements
+- Industry terminology presence
+- Skill keyword optimization
+- Formatting implications (based on structure)
+
+**Scoring Guide:**
+- 90-100: Excellent ATS optimization
+- 70-89: Good optimization, minor improvements needed
+- 50-69: Moderate optimization, significant improvements needed
+- Below 50: Poor optimization, major improvements required
+
+## OUTPUT FORMAT
+Return ONLY valid JSON:
+
 {
-  "existingKeywords": ["keywords already in the resume that are ATS-friendly"],
-  "missingKeywords": ["important keywords missing from the resume"],
-  "suggestedPhrases": ["specific phrases to add for better ATS scoring"],
-  "atsScore": 0-100 (estimated ATS compatibility score)
+  "existingKeywords": ["keyword1", "keyword2", "..."],
+  "missingKeywords": ["missing_keyword1", "missing_keyword2", "..."],
+  "suggestedPhrases": [
+    "Specific phrase suggestion 1",
+    "Specific phrase suggestion 2",
+    "..."
+  ],
+  "atsScore": 0-100
 }
 
-Focus on action verbs, industry terms, and quantifiable achievements.
-Only return valid JSON.`;
+Be specific and actionable. Only return valid JSON.`;
 
-  const response = await ai.models.generateContent({
+  const response = await generateContentWithFallback({
     model: "gemini-2.5-flash",
     contents: prompt,
     config: { temperature: 0.2 },
@@ -483,8 +806,6 @@ Only return valid JSON.`;
  * Check resume credibility - flags overlapping dates, unrealistic timelines, etc.
  */
 export async function checkCredibility(resume: ParsedResume): Promise<CredibilityResult> {
-  const ai = getGeminiClient();
-  
   const experienceDetails = resume.experience.map(e => ({
     position: e.position,
     company: e.company,
@@ -544,7 +865,7 @@ IMPORTANT:
 
 Only return valid JSON.`;
 
-  const response = await ai.models.generateContent({
+  const response = await generateContentWithFallback({
     model: "gemini-2.5-flash",
     contents: prompt,
     config: { temperature: 0.2 },
@@ -559,8 +880,6 @@ Only return valid JSON.`;
  * Quantify impact - improve weak resume bullets with metrics and strong verbs
  */
 export async function quantifyImpact(resume: ParsedResume): Promise<ImpactQuantificationResult> {
-  const ai = getGeminiClient();
-  
   // Collect all bullet points from experience
   const allBullets: string[] = [];
   resume.experience.forEach(exp => {
@@ -612,13 +931,19 @@ Improved: "Resolved 50+ customer support tickets weekly, achieving 98% satisfact
 
 Only return valid JSON.`;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-    config: { temperature: 0.3 },
-  });
-  
-  const text = response.text || "{}";
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
-  return JSON.parse(jsonMatch[1] || text);
+  try {
+    const response = await generateContentWithFallback({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: { temperature: 0.3 },
+    });
+    
+    const text = response.text || "{}";
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
+    return JSON.parse(jsonMatch[1] || text);
+  } catch (error: any) {
+    logger.error(`Impact quantification failed: ${error.message || String(error)}`);
+    // Re-throw with more context
+    throw new Error(`Failed to quantify impact: ${error.message || String(error)}`);
+  }
 }

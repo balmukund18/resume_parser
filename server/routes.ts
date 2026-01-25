@@ -17,9 +17,20 @@ import {
 import { validate, uploadSchema, exportSchema, idSchema } from "./utils/validation";
 import { createModuleLogger } from "./utils/logger";
 import { sendResumeEmail, isEmailConfigured } from "./utils/email";
+import { checkAIConfiguration, getCircuitBreakerStatus } from "./utils/ai-client";
+import { rateLimiters } from "./utils/rate-limiter";
 import type { ParsedResume, JobDescriptionInput } from "@shared/schema";
 
 const logger = createModuleLogger("Routes");
+
+// Helper to safely get ID from params
+function getParamId(params: { id?: string | string[] }): string {
+  const id = params.id;
+  if (Array.isArray(id)) {
+    return id[0];
+  }
+  return id || "";
+}
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -193,8 +204,118 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
-  // Upload resume endpoint
-  app.post("/api/resumes/upload", (req: Request, res: Response) => {
+  // CORS middleware (for separated frontend/backend deployments)
+  app.use((req: Request, res: Response, next) => {
+    const origin = req.headers.origin;
+    const allowedOrigins = process.env.ALLOWED_ORIGINS 
+      ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
+      : ["http://localhost:5000", "http://localhost:5173"]; // Default dev origins
+    
+    if (origin && (allowedOrigins.includes(origin) || process.env.NODE_ENV === "development")) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+    }
+    
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    
+    if (req.method === "OPTIONS") {
+      return res.sendStatus(200);
+    }
+    
+    next();
+  });
+
+  // Rate limiting - apply general rate limit to all API routes
+  // Can be disabled with DISABLE_RATE_LIMIT=true for testing
+  if (process.env.DISABLE_RATE_LIMIT !== "true") {
+    app.use("/api", rateLimiters.general);
+    logger.info("Rate limiting enabled");
+  } else {
+    logger.warn("Rate limiting is DISABLED (DISABLE_RATE_LIMIT=true)");
+  }
+
+  // Security headers
+  app.use((req: Request, res: Response, next) => {
+    // Prevent clickjacking
+    res.setHeader("X-Frame-Options", "DENY");
+    // Prevent MIME type sniffing
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // XSS protection
+    res.setHeader("X-XSS-Protection", "1; mode=block");
+    // Referrer policy
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    
+    // Only add HSTS in production with HTTPS
+    if (process.env.NODE_ENV === "production" && req.secure) {
+      res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    }
+    
+    next();
+  });
+
+  // Health check endpoint
+  app.get("/health", async (req: Request, res: Response) => {
+    try {
+      const aiConfig = checkAIConfiguration();
+      
+      // Check database connection
+      let dbStatus = "unknown";
+      try {
+        await storage.getJob("health-check-test-id").catch(() => {
+          // Expected to fail, but confirms DB connection works
+        });
+        dbStatus = "connected";
+      } catch {
+        dbStatus = "disconnected";
+      }
+
+      const circuitBreakerStatus = getCircuitBreakerStatus();
+      const timeUntilRetryMinutes = circuitBreakerStatus.timeUntilRetry 
+        ? Math.round(circuitBreakerStatus.timeUntilRetry / 1000 / 60)
+        : null;
+
+      const health = {
+        status: "ok",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        environment: process.env.NODE_ENV || "development",
+        services: {
+          database: dbStatus,
+          ai: {
+            gemini: aiConfig.gemini ? "configured" : "not_configured",
+            groq: aiConfig.groq ? "configured" : "not_configured",
+            circuitBreaker: {
+              isOpen: circuitBreakerStatus.isOpen,
+              failureCount: circuitBreakerStatus.failureCount,
+              timeUntilRetry: timeUntilRetryMinutes !== null ? `${timeUntilRetryMinutes} minutes` : null,
+              currentProvider: circuitBreakerStatus.isOpen ? "groq (circuit breaker open)" : "gemini (primary)",
+            },
+            manualOverride: {
+              forceGroq: process.env.FORCE_GROQ === "true",
+              forceGemini: process.env.FORCE_GEMINI === "true",
+            },
+          },
+          email: isEmailConfigured() ? "configured" : "not_configured",
+        },
+        version: process.env.npm_package_version || "1.0.0",
+      };
+
+      const isHealthy = dbStatus === "connected" && aiConfig.gemini;
+      res.status(isHealthy ? 200 : 503).json(health);
+    } catch (error) {
+      res.status(503).json({
+        status: "error",
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // Upload resume endpoint (with stricter rate limiting)
+  app.post("/api/resumes/upload", 
+    process.env.DISABLE_RATE_LIMIT !== "true" ? rateLimiters.upload : (req, res, next) => next(),
+    (req: Request, res: Response) => {
     upload.single("resume")(req, res, async (err) => {
       if (err instanceof multer.MulterError) {
         if (err.code === "LIMIT_FILE_SIZE") {
@@ -258,13 +379,14 @@ export async function registerRoutes(
   
   // Get job status
   app.get("/api/resumes/:id/status", async (req: Request, res: Response) => {
-    const validation = validate(idSchema, { id: req.params.id });
+    const id = getParamId(req.params);
+    const validation = validate(idSchema, { id });
     
     if (validation.error) {
       return res.status(400).json({ message: validation.error });
     }
     
-    const job = await storage.getJob(req.params.id);
+    const job = await storage.getJob(id);
     
     if (!job) {
       return res.status(404).json({ message: "Resume not found" });
@@ -277,13 +399,14 @@ export async function registerRoutes(
   
   // Get parsed resume
   app.get("/api/resumes/:id", async (req: Request, res: Response) => {
-    const validation = validate(idSchema, { id: req.params.id });
+    const id = getParamId(req.params);
+    const validation = validate(idSchema, { id });
     
     if (validation.error) {
       return res.status(400).json({ message: validation.error });
     }
     
-    const job = await storage.getJob(req.params.id);
+    const job = await storage.getJob(id);
     
     if (!job) {
       return res.status(404).json({ message: "Resume not found" });
@@ -301,7 +424,8 @@ export async function registerRoutes(
   
   // Export resume
   app.post("/api/resumes/:id/export", async (req: Request, res: Response) => {
-    const idValidation = validate(idSchema, { id: req.params.id });
+    const id = getParamId(req.params);
+    const idValidation = validate(idSchema, { id });
     
     if (idValidation.error) {
       return res.status(400).json({ message: idValidation.error });
@@ -313,7 +437,7 @@ export async function registerRoutes(
       return res.status(400).json({ message: formatValidation.error });
     }
     
-    const job = await storage.getJob(req.params.id);
+    const job = await storage.getJob(id);
     
     if (!job) {
       return res.status(404).json({ message: "Resume not found" });
@@ -339,19 +463,20 @@ export async function registerRoutes(
   
   // Delete resume
   app.delete("/api/resumes/:id", async (req: Request, res: Response) => {
-    const validation = validate(idSchema, { id: req.params.id });
+    const id = getParamId(req.params);
+    const validation = validate(idSchema, { id });
     
     if (validation.error) {
       return res.status(400).json({ message: validation.error });
     }
     
-    const deleted = await storage.deleteJob(req.params.id);
+    const deleted = await storage.deleteJob(id);
     
     if (!deleted) {
       return res.status(404).json({ message: "Resume not found" });
     }
     
-    logger.info(`Deleted resume ${req.params.id}`);
+    logger.info(`Deleted resume ${id}`);
     res.status(204).send();
   });
 
@@ -368,9 +493,12 @@ export async function registerRoutes(
     }
   });
 
-  // Skills Gap Analysis
-  app.post("/api/resumes/:id/skills-gap", async (req: Request, res: Response) => {
-    const validation = validate(idSchema, { id: req.params.id });
+  // Skills Gap Analysis (with analysis rate limiting)
+  app.post("/api/resumes/:id/skills-gap",
+    process.env.DISABLE_RATE_LIMIT !== "true" ? rateLimiters.analysis : (req, res, next) => next(),
+    async (req: Request, res: Response) => {
+    const id = getParamId(req.params);
+    const validation = validate(idSchema, { id });
     if (validation.error) {
       return res.status(400).json({ message: validation.error });
     }
@@ -381,7 +509,8 @@ export async function registerRoutes(
     }
 
     try {
-      const resume = await storage.getResume(req.params.id);
+      const id = getParamId(req.params);
+      const resume = await storage.getResume(id);
       if (!resume) {
         return res.status(404).json({ message: "Resume not found" });
       }
@@ -416,15 +545,18 @@ export async function registerRoutes(
     }
   });
 
-  // Resume Scoring
-  app.post("/api/resumes/:id/score", async (req: Request, res: Response) => {
-    const validation = validate(idSchema, { id: req.params.id });
+  // Resume Scoring (with analysis rate limiting)
+  app.post("/api/resumes/:id/score",
+    process.env.DISABLE_RATE_LIMIT !== "true" ? rateLimiters.analysis : (req, res, next) => next(),
+    async (req: Request, res: Response) => {
+    const id = getParamId(req.params);
+    const validation = validate(idSchema, { id });
     if (validation.error) {
       return res.status(400).json({ message: validation.error });
     }
 
     try {
-      const parsedResume = await storage.getParsedResume(req.params.id);
+      const parsedResume = await storage.getParsedResume(id);
       if (!parsedResume) {
         return res.status(404).json({ message: "Resume not found" });
       }
@@ -432,9 +564,9 @@ export async function registerRoutes(
       const result = await scoreResume(parsedResume);
       
       // Save score
-      await storage.saveResumeScore(req.params.id, result);
+      await storage.saveResumeScore(id, result);
 
-      logger.info(`Resume scoring completed for ${req.params.id}`);
+      logger.info(`Resume scoring completed for ${id}`);
       res.json(result);
     } catch (error) {
       logger.error(`Resume scoring failed: ${error}`);
@@ -442,20 +574,23 @@ export async function registerRoutes(
     }
   });
 
-  // Job Matching
-  app.post("/api/resumes/:id/match-job", async (req: Request, res: Response) => {
+  // Job Matching (with analysis rate limiting)
+  app.post("/api/resumes/:id/match-job",
+    process.env.DISABLE_RATE_LIMIT !== "true" ? rateLimiters.analysis : (req, res, next) => next(),
+    async (req: Request, res: Response) => {
     const validation = validate(idSchema, { id: req.params.id });
     if (validation.error) {
       return res.status(400).json({ message: validation.error });
     }
 
+    const id = getParamId(req.params);
     const { title, company, description } = req.body as JobDescriptionInput;
     if (!title || !description) {
       return res.status(400).json({ message: "Job title and description are required" });
     }
 
     try {
-      const parsedResume = await storage.getParsedResume(req.params.id);
+      const parsedResume = await storage.getParsedResume(id);
       if (!parsedResume) {
         return res.status(404).json({ message: "Resume not found" });
       }
@@ -473,9 +608,9 @@ export async function registerRoutes(
       const result = await matchResumeToJob(parsedResume, { title, company, description });
       
       // Save match
-      await storage.saveJobMatch(req.params.id, jobDesc.id, result);
+      await storage.saveJobMatch(id, jobDesc.id, result);
 
-      logger.info(`Job matching completed for resume ${req.params.id}`);
+      logger.info(`Job matching completed for resume ${id}`);
       res.json(result);
     } catch (error) {
       logger.error(`Job matching failed: ${error}`);
@@ -483,9 +618,12 @@ export async function registerRoutes(
     }
   });
 
-  // ATS Keyword Optimization
-  app.post("/api/resumes/:id/optimize-keywords", async (req: Request, res: Response) => {
-    const validation = validate(idSchema, { id: req.params.id });
+  // ATS Keyword Optimization (with analysis rate limiting)
+  app.post("/api/resumes/:id/optimize-keywords",
+    process.env.DISABLE_RATE_LIMIT !== "true" ? rateLimiters.analysis : (req, res, next) => next(),
+    async (req: Request, res: Response) => {
+    const id = getParamId(req.params);
+    const validation = validate(idSchema, { id });
     if (validation.error) {
       return res.status(400).json({ message: validation.error });
     }
@@ -493,7 +631,7 @@ export async function registerRoutes(
     const { title, description } = req.body as Partial<JobDescriptionInput>;
 
     try {
-      const parsedResume = await storage.getParsedResume(req.params.id);
+      const parsedResume = await storage.getParsedResume(id);
       if (!parsedResume) {
         return res.status(404).json({ message: "Resume not found" });
       }
@@ -502,9 +640,9 @@ export async function registerRoutes(
       const result = await optimizeKeywords(parsedResume, targetJob);
       
       // Save recommendations
-      await storage.saveKeywordRecommendations(req.params.id, null, result);
+      await storage.saveKeywordRecommendations(id, null, result);
 
-      logger.info(`Keyword optimization completed for resume ${req.params.id}`);
+      logger.info(`Keyword optimization completed for resume ${id}`);
       res.json(result);
     } catch (error) {
       logger.error(`Keyword optimization failed: ${error}`);
@@ -512,22 +650,25 @@ export async function registerRoutes(
     }
   });
 
-  // Resume Credibility Check
-  app.post("/api/resumes/:id/credibility", async (req: Request, res: Response) => {
-    const validation = validate(idSchema, { id: req.params.id });
+  // Resume Credibility Check (with analysis rate limiting)
+  app.post("/api/resumes/:id/credibility",
+    process.env.DISABLE_RATE_LIMIT !== "true" ? rateLimiters.analysis : (req, res, next) => next(),
+    async (req: Request, res: Response) => {
+    const id = getParamId(req.params);
+    const validation = validate(idSchema, { id });
     if (validation.error) {
       return res.status(400).json({ message: validation.error });
     }
 
     try {
-      const parsedResume = await storage.getParsedResume(req.params.id);
+      const parsedResume = await storage.getParsedResume(id);
       if (!parsedResume) {
         return res.status(404).json({ message: "Resume not found" });
       }
 
       const result = await checkCredibility(parsedResume);
       
-      logger.info(`Credibility check completed for resume ${req.params.id}`);
+      logger.info(`Credibility check completed for resume ${id}`);
       res.json(result);
     } catch (error) {
       logger.error(`Credibility check failed: ${error}`);
@@ -535,26 +676,42 @@ export async function registerRoutes(
     }
   });
 
-  // Impact Quantification
-  app.post("/api/resumes/:id/impact", async (req: Request, res: Response) => {
-    const validation = validate(idSchema, { id: req.params.id });
+  // Impact Quantification (with analysis rate limiting)
+  app.post("/api/resumes/:id/impact",
+    process.env.DISABLE_RATE_LIMIT !== "true" ? rateLimiters.analysis : (req, res, next) => next(),
+    async (req: Request, res: Response) => {
+    const id = getParamId(req.params);
+    const validation = validate(idSchema, { id });
     if (validation.error) {
       return res.status(400).json({ message: validation.error });
     }
 
     try {
-      const parsedResume = await storage.getParsedResume(req.params.id);
+      const parsedResume = await storage.getParsedResume(id);
       if (!parsedResume) {
         return res.status(404).json({ message: "Resume not found" });
       }
 
       const result = await quantifyImpact(parsedResume);
       
-      logger.info(`Impact quantification completed for resume ${req.params.id}`);
+      logger.info(`Impact quantification completed for resume ${id}`);
       res.json(result);
-    } catch (error) {
-      logger.error(`Impact quantification failed: ${error}`);
-      res.status(500).json({ message: "Failed to quantify impact" });
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error(`Impact quantification failed: ${errorMessage}`);
+      
+      // Check if it's an AI generation error that might have fallback info
+      if (errorMessage.includes("quota") || errorMessage.includes("Groq")) {
+        res.status(503).json({ 
+          message: "AI service temporarily unavailable. Please try again later.",
+          details: errorMessage 
+        });
+      } else {
+        res.status(500).json({ 
+          message: "Failed to quantify impact",
+          details: process.env.NODE_ENV === "development" ? errorMessage : undefined
+        });
+      }
     }
   });
 
@@ -696,7 +853,7 @@ async function processResume(
       throw new Error("No text could be extracted from the file");
     }
     
-    logger.info(`Extracted ${extraction.text.length} characters from ${originalFilename}`);
+    logger.info(`Extracted ${extraction.text.length} characters and ${extraction.links.length} hyperlinks from ${originalFilename}`);
     
     // Parse with AI (with retries)
     let parseResult = null;
@@ -704,7 +861,7 @@ async function processResume(
     
     while (attempt < maxRetries) {
       try {
-        parseResult = await parseResumeWithAI(extraction.text, {
+        parseResult = await parseResumeWithAI(extraction.text, extraction.links, {
           originalFilename,
           fileType,
           fileSize,

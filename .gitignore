@@ -4,3 +4,64 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+
+# Environment variables (CRITICAL - never commit secrets!)
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploads directory (user-uploaded files)
+uploads/
+*.pdf
+*.docx
+*.doc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
+
+# Build artifacts
+*.tsbuildinfo
+.cache/
+
+# Development documentation (deployment/improvement notes)
+# Keep only README.md - ignore all other documentation files
+AI_PROVIDER_FLOW.md
+BEST_DEPLOYMENT_OPTION.md
+CRITICAL_SECURITY_FIX.md
+DEPLOYMENT.md
+DEPLOYMENT_READY.md
+FALLBACK_FIX.md
+FINAL_IMPROVEMENTS_SUMMARY.md
+IMPROVEMENTS.md
+PRE_DEPLOYMENT_CHECKLIST.md
+PROMPT_ENHANCEMENTS.md
+
+# Test files
+test-*.ts
+test-*.js
+
+# Development assets (screenshots, pasted content, etc.)
+attached_assets/
+*.png
+*.jpg
+*.jpeg
+*.gif
+# Ignore text files in root (but keep README.md)
+*.txt
+!README.md

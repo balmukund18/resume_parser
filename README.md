@@ -1,6 +1,6 @@
 # Resume Parser Application
 
-AI-powered resume parsing web application with advanced analysis features. Extracts structured data from PDF, DOCX, and TXT files using AI.
+AI-powered resume parsing web application with advanced analysis features. Extracts structured data from PDF, DOCX, and TXT files using Google Gemini AI.
 
 ## Overview
 
@@ -29,7 +29,7 @@ This application allows users to upload resume files and uses AI to extract stru
 - **Backend**: Node.js, Express.js, TypeScript
 - **Database**: PostgreSQL with Drizzle ORM (permanent storage)
 - **File Uploads**: Multer (10MB limit, PDF/DOCX/TXT support)
-- **AI Extraction**: Gemini API (supports user's own GEMINI_API_KEY or Replit AI Integrations)
+- **AI Extraction**: Google Gemini API
 - **PDF Parsing**: pdfjs-dist (Mozilla PDF.js)
 - **DOCX Parsing**: mammoth
 - **Validation**: Joi
@@ -107,14 +107,29 @@ This application allows users to upload resume files and uses AI to extract stru
 
 ## Environment Variables
 
-- `GEMINI_API_KEY` - User's own Google Gemini API key (preferred for GitHub deployment)
-- `AI_INTEGRATIONS_GEMINI_API_KEY` - Replit AI Integrations fallback
-- `DATABASE_URL` - PostgreSQL connection string (auto-configured by Replit)
+- `GEMINI_API_KEY` - Google Gemini API key (required)
+- `DATABASE_URL` - PostgreSQL connection string
 - `SESSION_SECRET` - Session secret for security
 - `SMTP_HOST` - SMTP server hostname for email (e.g., smtp.gmail.com)
 - `SMTP_PORT` - SMTP server port (default: 587)
 - `SMTP_USER` - SMTP username/email
 - `SMTP_PASS` - SMTP password or app password
+
+## Google Gemini API Setup
+
+1. **Get API Key**:
+   - Go to [Google AI Studio](https://ai.google.dev/)
+   - Click "Get API Key"
+   - Create a new project or select existing one
+   - Copy the API key
+
+2. **Free Tier Limits**:
+   - **gemini-1.5-flash**: 15 requests per minute, 1 million tokens per minute, 1500 requests per day
+   - **gemini-2.5-flash**: 20 requests per day (very limited)
+
+3. **For Production Use**:
+   - Consider enabling billing for higher quotas
+   - Paid tier: 1 million+ requests per day with much higher rate limits
 
 ## Features
 
@@ -131,20 +146,39 @@ This application allows users to upload resume files and uses AI to extract stru
 
 ## Running the Application
 
-The application is started with `npm run dev` which runs both the Express backend and Vite frontend on port 5000.
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
 
-## Recent Changes
+2. **Set up Environment Variables**:
+   Create a `.env` file in the root directory:
+   ```bash
+   GEMINI_API_KEY=your_google_gemini_api_key
+   DATABASE_URL=postgresql://username:password@localhost:5432/resume_parser
+   SESSION_SECRET=your_session_secret
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=your_email@gmail.com
+   SMTP_PASS=your_app_password
+   ```
 
-- 2025-01-25: Added nodemailer for sending parsed resume data via email
-- 2025-01-25: Added Extracted Links section to display parsed URLs
-- 2025-01-25: Removed LinkedIn import feature
-- 2025-01-25: Removed "Powered by Google Gemini AI" branding
-- 2025-01-25: Added Resume Credibility Checker (timeline analysis, overlapping dates, skill mismatches)
-- 2025-01-25: Added Impact Quantification Engine (transforms weak bullets into strong achievements)
-- 2025-01-25: Enhanced resume parser with comprehensive link extraction (profiles, projects, certifications)
-- 2025-01-25: Added PostgreSQL database with Drizzle ORM for permanent storage
-- 2025-01-25: Added Skills Gap Analysis, Resume Scoring, Job Matching features
-- 2025-01-25: Added ATS Keyword Optimization feature
-- 2025-01-25: Added AnalysisPanel component with tabbed UI (8 tabs)
-- 2025-01-25: Modified Gemini integration to support user's own API key (GEMINI_API_KEY)
-- 2025-01-25: Fixed PDF parsing with pdfjs-dist instead of pdf-parse
+3. **Set up Database**:
+   ```bash
+   npm run db:push
+   ```
+
+4. **Start the Application**:
+   ```bash
+   npm run dev
+   ```
+
+The application will be available at `http://localhost:5000`
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License.

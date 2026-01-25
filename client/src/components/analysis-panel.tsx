@@ -536,7 +536,7 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                   <ScoreCircle score={skillsGapResult.matchScore} label="Match Score" size="lg" />
                 </div>
                 
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <h4 className="font-semibold text-green-600 flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4" />
@@ -544,7 +544,7 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                     </h4>
                     <div className="flex flex-wrap gap-1">
                       {skillsGapResult.matchingSkills.map((skill, i) => (
-                        <Badge key={i} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                        <Badge key={i} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 max-w-full break-words text-center">
                           {skill}
                         </Badge>
                       ))}
@@ -558,7 +558,7 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                     </h4>
                     <div className="flex flex-wrap gap-1">
                       {skillsGapResult.missingSkills.map((skill, i) => (
-                        <Badge key={i} variant="outline" className="border-red-300 text-red-700 dark:border-red-700 dark:text-red-300">
+                        <Badge key={i} variant="outline" className="border-red-300 text-red-700 dark:border-red-700 dark:text-red-300 max-w-full break-words text-center whitespace-normal">
                           {skill}
                         </Badge>
                       ))}
@@ -713,18 +713,6 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
 
           <TabsContent value="email" className="space-y-4">
             <div className="space-y-4">
-              <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="font-semibold text-amber-900 dark:text-amber-100">SMTP Configuration Required</h4>
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
-                      To send emails, configure SMTP settings: SMTP_HOST, SMTP_USER, SMTP_PASS, and optionally SMTP_PORT (defaults to 587).
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="email-address">Email Address</Label>
