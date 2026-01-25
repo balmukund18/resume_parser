@@ -5,10 +5,17 @@ import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
 import { extractText, getFileType, validateMimeType } from "./utils/text-extractor";
-import { parseResumeWithAI } from "./utils/resume-parser";
+import { 
+  parseResumeWithAI, 
+  analyzeSkillsGap, 
+  scoreResume, 
+  matchResumeToJob, 
+  optimizeKeywords,
+  importFromLinkedIn 
+} from "./utils/resume-parser";
 import { validate, uploadSchema, exportSchema, idSchema } from "./utils/validation";
 import { createModuleLogger } from "./utils/logger";
-import type { ParsedResume } from "@shared/schema";
+import type { ParsedResume, JobDescriptionInput } from "@shared/schema";
 
 const logger = createModuleLogger("Routes");
 
@@ -344,6 +351,263 @@ export async function registerRoutes(
     
     logger.info(`Deleted resume ${req.params.id}`);
     res.status(204).send();
+  });
+
+  // ============== NEW ANALYSIS ENDPOINTS ==============
+
+  // Get all saved resumes
+  app.get("/api/resumes/saved/all", async (req: Request, res: Response) => {
+    try {
+      const resumes = await storage.getAllResumes();
+      res.json(resumes);
+    } catch (error) {
+      logger.error(`Failed to get resumes: ${error}`);
+      res.status(500).json({ message: "Failed to retrieve resumes" });
+    }
+  });
+
+  // Skills Gap Analysis
+  app.post("/api/resumes/:id/skills-gap", async (req: Request, res: Response) => {
+    const validation = validate(idSchema, { id: req.params.id });
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+
+    const { title, company, description } = req.body as JobDescriptionInput;
+    if (!title || !description) {
+      return res.status(400).json({ message: "Job title and description are required" });
+    }
+
+    try {
+      const resume = await storage.getResume(req.params.id);
+      if (!resume) {
+        return res.status(404).json({ message: "Resume not found" });
+      }
+
+      // Create job description record
+      const jobDesc = await storage.createJobDescription({
+        title,
+        company: company || null,
+        description,
+        requiredSkills: [],
+        preferredSkills: [],
+        keywords: [],
+      });
+
+      // Analyze skills gap
+      const result = await analyzeSkillsGap(
+        { 
+          technical: resume.skills?.technical || [], 
+          soft: resume.skills?.soft || [] 
+        },
+        { title, description }
+      );
+
+      // Save analysis
+      await storage.saveSkillsGapAnalysis(resume.id, jobDesc.id, result);
+
+      logger.info(`Skills gap analysis completed for resume ${resume.id}`);
+      res.json(result);
+    } catch (error) {
+      logger.error(`Skills gap analysis failed: ${error}`);
+      res.status(500).json({ message: "Failed to analyze skills gap" });
+    }
+  });
+
+  // Resume Scoring
+  app.post("/api/resumes/:id/score", async (req: Request, res: Response) => {
+    const validation = validate(idSchema, { id: req.params.id });
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job || !job.result) {
+        return res.status(404).json({ message: "Resume not found or not processed" });
+      }
+
+      const result = await scoreResume(job.result);
+      
+      // Save score
+      await storage.saveResumeScore(job.result.id, result);
+
+      logger.info(`Resume scoring completed for ${job.result.id}`);
+      res.json(result);
+    } catch (error) {
+      logger.error(`Resume scoring failed: ${error}`);
+      res.status(500).json({ message: "Failed to score resume" });
+    }
+  });
+
+  // Job Matching
+  app.post("/api/resumes/:id/match-job", async (req: Request, res: Response) => {
+    const validation = validate(idSchema, { id: req.params.id });
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+
+    const { title, company, description } = req.body as JobDescriptionInput;
+    if (!title || !description) {
+      return res.status(400).json({ message: "Job title and description are required" });
+    }
+
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job || !job.result) {
+        return res.status(404).json({ message: "Resume not found or not processed" });
+      }
+
+      // Create job description record
+      const jobDesc = await storage.createJobDescription({
+        title,
+        company: company || null,
+        description,
+        requiredSkills: [],
+        preferredSkills: [],
+        keywords: [],
+      });
+
+      const result = await matchResumeToJob(job.result, { title, company, description });
+      
+      // Save match
+      await storage.saveJobMatch(job.result.id, jobDesc.id, result);
+
+      logger.info(`Job matching completed for resume ${job.result.id}`);
+      res.json(result);
+    } catch (error) {
+      logger.error(`Job matching failed: ${error}`);
+      res.status(500).json({ message: "Failed to match job" });
+    }
+  });
+
+  // ATS Keyword Optimization
+  app.post("/api/resumes/:id/optimize-keywords", async (req: Request, res: Response) => {
+    const validation = validate(idSchema, { id: req.params.id });
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+
+    const { title, description } = req.body as Partial<JobDescriptionInput>;
+
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job || !job.result) {
+        return res.status(404).json({ message: "Resume not found or not processed" });
+      }
+
+      const targetJob = title && description ? { title, description } : undefined;
+      const result = await optimizeKeywords(job.result, targetJob);
+      
+      // Save recommendations
+      await storage.saveKeywordRecommendations(job.result.id, null, result);
+
+      logger.info(`Keyword optimization completed for resume ${job.result.id}`);
+      res.json(result);
+    } catch (error) {
+      logger.error(`Keyword optimization failed: ${error}`);
+      res.status(500).json({ message: "Failed to optimize keywords" });
+    }
+  });
+
+  // LinkedIn Import
+  app.post("/api/resumes/import-linkedin", async (req: Request, res: Response) => {
+    const { linkedinUrl } = req.body;
+    if (!linkedinUrl || !linkedinUrl.includes("linkedin.com")) {
+      return res.status(400).json({ message: "Valid LinkedIn URL is required" });
+    }
+
+    try {
+      const result = await importFromLinkedIn(linkedinUrl);
+      logger.info(`LinkedIn import attempted for ${linkedinUrl}`);
+      res.json({
+        message: "LinkedIn data extraction is limited. For full import, please upload your LinkedIn PDF export.",
+        partialData: result,
+        instructions: [
+          "Go to LinkedIn and click on your profile",
+          "Click 'More' button and select 'Save to PDF'",
+          "Upload the downloaded PDF to this resume parser"
+        ]
+      });
+    } catch (error) {
+      logger.error(`LinkedIn import failed: ${error}`);
+      res.status(500).json({ message: "Failed to import from LinkedIn" });
+    }
+  });
+
+  // Email Notification (placeholder - requires email service setup)
+  app.post("/api/resumes/:id/send-email", async (req: Request, res: Response) => {
+    const validation = validate(idSchema, { id: req.params.id });
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+
+    const { email, includeAnalysis } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email address is required" });
+    }
+
+    try {
+      const job = await storage.getJob(req.params.id);
+      if (!job || !job.result) {
+        return res.status(404).json({ message: "Resume not found or not processed" });
+      }
+
+      // Log the notification attempt
+      await storage.logEmailNotification(
+        job.result.id,
+        email,
+        `Resume Analysis Results - ${job.result.name}`,
+        "pending"
+      );
+
+      // Note: Actual email sending requires email service integration
+      logger.info(`Email notification logged for resume ${job.result.id} to ${email}`);
+      res.json({
+        message: "Email notification queued. Note: Email service requires configuration.",
+        email,
+        resumeId: job.result.id,
+        includeAnalysis: includeAnalysis || false,
+        status: "Email service not configured. To enable, set up SendGrid or Resend integration."
+      });
+    } catch (error) {
+      logger.error(`Email notification failed: ${error}`);
+      res.status(500).json({ message: "Failed to send email notification" });
+    }
+  });
+
+  // Get all job descriptions
+  app.get("/api/job-descriptions", async (req: Request, res: Response) => {
+    try {
+      const jobDescs = await storage.getAllJobDescriptions();
+      res.json(jobDescs);
+    } catch (error) {
+      logger.error(`Failed to get job descriptions: ${error}`);
+      res.status(500).json({ message: "Failed to retrieve job descriptions" });
+    }
+  });
+
+  // Create job description
+  app.post("/api/job-descriptions", async (req: Request, res: Response) => {
+    const { title, company, description } = req.body as JobDescriptionInput;
+    if (!title || !description) {
+      return res.status(400).json({ message: "Title and description are required" });
+    }
+
+    try {
+      const jobDesc = await storage.createJobDescription({
+        title,
+        company: company || null,
+        description,
+        requiredSkills: [],
+        preferredSkills: [],
+        keywords: [],
+      });
+      res.status(201).json(jobDesc);
+    } catch (error) {
+      logger.error(`Failed to create job description: ${error}`);
+      res.status(500).json({ message: "Failed to create job description" });
+    }
   });
   
   return httpServer;
