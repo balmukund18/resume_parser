@@ -1,6 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { createModuleLogger } from "./logger";
-import type { ParsedResume, Metadata, SkillsGapResult, ResumeScoreResult, JobMatchResult, KeywordOptimization } from "@shared/schema";
+import type { 
+  ParsedResume, Metadata, SkillsGapResult, ResumeScoreResult, 
+  JobMatchResult, KeywordOptimization, CredibilityResult, ImpactQuantificationResult 
+} from "@shared/schema";
 
 const logger = createModuleLogger("ResumeParser");
 
@@ -427,30 +430,168 @@ Only return valid JSON.`;
 }
 
 /**
- * Import LinkedIn profile data from a URL (parses public profile)
+ * Import LinkedIn profile data from a URL - provides instructions
  */
-export async function importFromLinkedIn(linkedinUrl: string): Promise<Partial<ParsedResume>> {
-  const ai = getGeminiClient();
+export async function importFromLinkedIn(linkedinUrl: string): Promise<{ 
+  username: string | null;
+  profileUrl: string;
+  instructions: string[];
+}> {
+  // Extract username from LinkedIn URL
+  const usernameMatch = linkedinUrl.match(/linkedin\.com\/in\/([^\/\?]+)/);
+  const username = usernameMatch ? usernameMatch[1] : null;
   
-  const prompt = `Given this LinkedIn URL: ${linkedinUrl}
-
-I cannot access the URL directly, but based on the URL format, extract any information visible in the URL itself (like username).
-
-Since I cannot access external URLs, return a template structure that would need to be filled in:
-{
-  "name": "Extract from URL if possible or 'Unknown'",
-  "contactInfo": {
-    "linkedin": "${linkedinUrl}"
-  },
-  "note": "LinkedIn data import requires the user to manually provide profile data or use LinkedIn's official API"
+  return {
+    username,
+    profileUrl: linkedinUrl,
+    instructions: [
+      "1. Open your LinkedIn profile in a browser",
+      "2. Click the 'More' button (three dots) near your profile photo",
+      "3. Select 'Save to PDF' from the dropdown menu",
+      "4. Wait for LinkedIn to generate your PDF",
+      "5. Download the PDF and upload it to this resume parser",
+      "6. The parser will extract all your profile data automatically"
+    ]
+  };
 }
 
-Return valid JSON only.`;
+/**
+ * Check resume credibility - flags overlapping dates, unrealistic timelines, etc.
+ */
+export async function checkCredibility(resume: ParsedResume): Promise<CredibilityResult> {
+  const ai = getGeminiClient();
+  
+  const experienceDetails = resume.experience.map(e => ({
+    position: e.position,
+    company: e.company,
+    startDate: e.startDate,
+    endDate: e.endDate,
+    responsibilities: e.responsibilities.length,
+  }));
+
+  const prompt = `You are a resume credibility analyst. Analyze this resume for potential red flags and inconsistencies.
+
+RESUME DATA:
+Name: ${resume.name}
+Total Experience Entries: ${resume.experience.length}
+Experience Timeline:
+${JSON.stringify(experienceDetails, null, 2)}
+
+Skills: ${[...resume.skills.technical, ...resume.skills.soft].join(", ")}
+
+Education:
+${resume.education.map(e => `${e.degree} from ${e.institution} (${e.graduationDate || 'N/A'})`).join("\n")}
+
+ANALYSIS REQUIREMENTS:
+1. Check for overlapping job dates
+2. Check for unrealistic career progression (e.g., junior to CEO in 2 years)
+3. Check for skill-experience mismatch (e.g., "10 years React" but only 3 years total experience)
+4. Check for employment gaps (not necessarily bad, just note them)
+5. Check if claimed expertise matches experience level
+6. Look for too many senior roles too quickly
+
+Return a JSON response:
+{
+  "credibilityScore": 0-100 (100 = highly credible, lower = more red flags),
+  "flags": [
+    {
+      "type": "overlapping_dates" | "unrealistic_timeline" | "skill_mismatch" | "rapid_progression" | "gap_detected" | "other",
+      "severity": "low" | "medium" | "high",
+      "message": "Brief description of the issue",
+      "details": "More context if needed"
+    }
+  ],
+  "timelineAnalysis": {
+    "totalYearsExperience": number,
+    "careerStartYear": number or null,
+    "averageTenure": number (average months per position),
+    "gaps": [
+      { "start": "YYYY-MM", "end": "YYYY-MM", "durationMonths": number }
+    ]
+  },
+  "overallAssessment": "Summary of credibility analysis - be fair and objective"
+}
+
+IMPORTANT:
+- Be objective, not accusatory. These are flags for review, not accusations.
+- A gap is not a red flag by itself, just note it.
+- Some rapid progression is normal in fast-growing industries.
+- If the resume looks credible, give a high score and minimal flags.
+
+Only return valid JSON.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
-    config: { temperature: 0.1 },
+    config: { temperature: 0.2 },
+  });
+  
+  const text = response.text || "{}";
+  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
+  return JSON.parse(jsonMatch[1] || text);
+}
+
+/**
+ * Quantify impact - improve weak resume bullets with metrics and strong verbs
+ */
+export async function quantifyImpact(resume: ParsedResume): Promise<ImpactQuantificationResult> {
+  const ai = getGeminiClient();
+  
+  // Collect all bullet points from experience
+  const allBullets: string[] = [];
+  resume.experience.forEach(exp => {
+    allBullets.push(...exp.responsibilities);
+    allBullets.push(...exp.achievements);
+  });
+
+  const prompt = `You are an expert resume writer. Analyze these resume bullet points and identify weak ones that lack impact, metrics, or strong action verbs.
+
+BULLET POINTS TO ANALYZE:
+${allBullets.map((b, i) => `${i + 1}. ${b}`).join("\n")}
+
+WEAK BULLET INDICATORS:
+- Vague verbs: "worked on", "helped with", "was responsible for", "assisted"
+- No quantifiable results
+- Missing context or scope
+- Passive voice
+- No mention of impact or outcomes
+
+YOUR TASK:
+1. Identify weak bullets
+2. Rewrite each weak bullet to be stronger with:
+   - Strong action verbs (Led, Developed, Implemented, Increased, Reduced, etc.)
+   - Quantifiable metrics when possible (%, $, numbers)
+   - Clear context and impact
+   - If metrics aren't available, suggest placeholders like "X%" or "[number]"
+
+Return a JSON response:
+{
+  "weakBulletsCount": number of bullets that need improvement,
+  "improvedBullets": [
+    {
+      "original": "the original weak bullet",
+      "improved": "the stronger rewritten version",
+      "improvementType": "added_metrics" | "stronger_verbs" | "added_context" | "quantified_results" | "clarified_impact",
+      "confidenceScore": 0-100 (how confident you are in this improvement)
+    }
+  ],
+  "overallImpactScore": 0-100 (how impactful the resume bullets are overall),
+  "suggestions": ["general tips for improving resume impact"]
+}
+
+EXAMPLES OF IMPROVEMENTS:
+Original: "Worked on backend APIs"
+Improved: "Developed RESTful APIs serving 20K+ daily requests, reducing response time by 35%"
+
+Original: "Helped with customer issues"
+Improved: "Resolved 50+ customer support tickets weekly, achieving 98% satisfaction rating"
+
+Only return valid JSON.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: prompt,
+    config: { temperature: 0.3 },
   });
   
   const text = response.text || "{}";

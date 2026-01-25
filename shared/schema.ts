@@ -272,6 +272,63 @@ export const keywordOptimizationSchema = z.object({
   atsScore: z.number().min(0).max(100),
 });
 
+// Credibility Check schema
+export const credibilityFlagSchema = z.object({
+  type: z.enum(["overlapping_dates", "unrealistic_timeline", "skill_mismatch", "rapid_progression", "gap_detected", "other"]),
+  severity: z.enum(["low", "medium", "high"]),
+  message: z.string(),
+  details: z.string().optional(),
+});
+
+export const credibilityResultSchema = z.object({
+  credibilityScore: z.number().min(0).max(100),
+  flags: z.array(credibilityFlagSchema),
+  timelineAnalysis: z.object({
+    totalYearsExperience: z.number(),
+    careerStartYear: z.number().optional(),
+    averageTenure: z.number(),
+    gaps: z.array(z.object({
+      start: z.string(),
+      end: z.string(),
+      durationMonths: z.number(),
+    })),
+  }),
+  overallAssessment: z.string(),
+});
+
+// Impact Quantification schema
+export const bulletImprovementSchema = z.object({
+  original: z.string(),
+  improved: z.string(),
+  improvementType: z.enum(["added_metrics", "stronger_verbs", "added_context", "quantified_results", "clarified_impact"]),
+  confidenceScore: z.number().min(0).max(100),
+});
+
+export const impactQuantificationResultSchema = z.object({
+  weakBulletsCount: z.number(),
+  improvedBullets: z.array(bulletImprovementSchema),
+  overallImpactScore: z.number().min(0).max(100),
+  suggestions: z.array(z.string()),
+});
+
+// Links extraction schema
+export const extractedLinkSchema = z.object({
+  url: z.string(),
+  anchorText: z.string().optional(),
+  sourceSection: z.string(),
+  category: z.enum(["profile", "project", "experience", "education", "certification", "additional"]),
+  confidenceScore: z.number().min(0).max(100),
+});
+
+export const linksExtractionSchema = z.object({
+  profiles: z.array(extractedLinkSchema),
+  projects: z.array(extractedLinkSchema),
+  experience: z.array(extractedLinkSchema),
+  education: z.array(extractedLinkSchema),
+  certifications: z.array(extractedLinkSchema),
+  additional: z.array(extractedLinkSchema),
+});
+
 // Types
 export type ContactInfo = z.infer<typeof contactInfoSchema>;
 export type Experience = z.infer<typeof experienceSchema>;
@@ -287,6 +344,12 @@ export type SkillsGapResult = z.infer<typeof skillsGapResultSchema>;
 export type ResumeScoreResult = z.infer<typeof resumeScoreResultSchema>;
 export type JobMatchResult = z.infer<typeof jobMatchResultSchema>;
 export type KeywordOptimization = z.infer<typeof keywordOptimizationSchema>;
+export type CredibilityFlag = z.infer<typeof credibilityFlagSchema>;
+export type CredibilityResult = z.infer<typeof credibilityResultSchema>;
+export type BulletImprovement = z.infer<typeof bulletImprovementSchema>;
+export type ImpactQuantificationResult = z.infer<typeof impactQuantificationResultSchema>;
+export type ExtractedLink = z.infer<typeof extractedLinkSchema>;
+export type LinksExtraction = z.infer<typeof linksExtractionSchema>;
 
 // Database types
 export type Resume = typeof resumes.$inferSelect;

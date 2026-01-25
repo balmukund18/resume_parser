@@ -11,7 +11,9 @@ import {
   scoreResume, 
   matchResumeToJob, 
   optimizeKeywords,
-  importFromLinkedIn 
+  importFromLinkedIn,
+  checkCredibility,
+  quantifyImpact
 } from "./utils/resume-parser";
 import { validate, uploadSchema, exportSchema, idSchema } from "./utils/validation";
 import { createModuleLogger } from "./utils/logger";
@@ -519,19 +521,66 @@ export async function registerRoutes(
 
     try {
       const result = await importFromLinkedIn(linkedinUrl);
-      logger.info(`LinkedIn import attempted for ${linkedinUrl}`);
+      logger.info(`LinkedIn import guide requested for ${linkedinUrl}`);
       res.json({
-        message: "LinkedIn data extraction is limited. For full import, please upload your LinkedIn PDF export.",
-        partialData: result,
-        instructions: [
-          "Go to LinkedIn and click on your profile",
-          "Click 'More' button and select 'Save to PDF'",
-          "Upload the downloaded PDF to this resume parser"
-        ]
+        success: true,
+        username: result.username,
+        profileUrl: result.profileUrl,
+        message: result.username 
+          ? `Found profile: ${result.username}. Follow the steps below to import your full profile.`
+          : "Follow the steps below to export and import your LinkedIn profile.",
+        instructions: result.instructions,
+        tip: "LinkedIn PDF export includes your complete profile data which our AI can parse accurately."
       });
     } catch (error) {
       logger.error(`LinkedIn import failed: ${error}`);
-      res.status(500).json({ message: "Failed to import from LinkedIn" });
+      res.status(500).json({ message: "Failed to process LinkedIn URL" });
+    }
+  });
+
+  // Resume Credibility Check
+  app.post("/api/resumes/:id/credibility", async (req: Request, res: Response) => {
+    const validation = validate(idSchema, { id: req.params.id });
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+
+    try {
+      const parsedResume = await storage.getParsedResume(req.params.id);
+      if (!parsedResume) {
+        return res.status(404).json({ message: "Resume not found" });
+      }
+
+      const result = await checkCredibility(parsedResume);
+      
+      logger.info(`Credibility check completed for resume ${req.params.id}`);
+      res.json(result);
+    } catch (error) {
+      logger.error(`Credibility check failed: ${error}`);
+      res.status(500).json({ message: "Failed to check credibility" });
+    }
+  });
+
+  // Impact Quantification
+  app.post("/api/resumes/:id/impact", async (req: Request, res: Response) => {
+    const validation = validate(idSchema, { id: req.params.id });
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+
+    try {
+      const parsedResume = await storage.getParsedResume(req.params.id);
+      if (!parsedResume) {
+        return res.status(404).json({ message: "Resume not found" });
+      }
+
+      const result = await quantifyImpact(parsedResume);
+      
+      logger.info(`Impact quantification completed for resume ${req.params.id}`);
+      res.json(result);
+    } catch (error) {
+      logger.error(`Impact quantification failed: ${error}`);
+      res.status(500).json({ message: "Failed to quantify impact" });
     }
   });
 
