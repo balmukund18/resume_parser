@@ -1,10 +1,10 @@
 # Resume Parser Application
 
-AI-powered resume parsing web application with advanced analysis features. Extracts structured data from PDF, DOCX, and TXT files using Google Gemini AI.
+AI-powered resume parsing web application with advanced analysis features. Extracts structured data from PDF, DOCX, and TXT files using AI.
 
 ## Overview
 
-This application allows users to upload resume files and uses Google Gemini AI to extract structured information and provide advanced analytics including:
+This application allows users to upload resume files and uses AI to extract structured information and provide advanced analytics including:
 - Personal/Contact Information extraction
 - Work Experience parsing
 - Education history
@@ -20,7 +20,6 @@ This application allows users to upload resume files and uses Google Gemini AI t
 - **ATS Keyword Optimization**: Suggest missing keywords for better ATS compatibility
 - **Resume Credibility Checker**: Flags overlapping dates, unrealistic timelines, skill-experience mismatches, rapid career progression
 - **Impact Quantification Engine**: Transforms weak resume bullets into powerful quantified achievements with strong action verbs
-- **LinkedIn Import**: Step-by-step instructions for importing LinkedIn profile data via PDF export
 - **Enhanced Link Extraction**: Extracts all URLs, profile links, project repos, and certification credentials from resumes
 - **Email Notifications**: Send parsed resume data via email using nodemailer (requires SMTP configuration)
 
@@ -30,7 +29,7 @@ This application allows users to upload resume files and uses Google Gemini AI t
 - **Backend**: Node.js, Express.js, TypeScript
 - **Database**: PostgreSQL with Drizzle ORM (permanent storage)
 - **File Uploads**: Multer (10MB limit, PDF/DOCX/TXT support)
-- **AI Extraction**: Google Gemini API (supports user's own GEMINI_API_KEY or Replit AI Integrations)
+- **AI Extraction**: Gemini API (supports user's own GEMINI_API_KEY or Replit AI Integrations)
 - **PDF Parsing**: pdfjs-dist (Mozilla PDF.js)
 - **DOCX Parsing**: mammoth
 - **Validation**: Joi
@@ -100,7 +99,6 @@ This application allows users to upload resume files and uses Google Gemini AI t
 - `POST /api/resumes/:id/optimize-keywords` - Get ATS keyword recommendations
 - `POST /api/resumes/:id/credibility` - Check resume credibility (timeline analysis, flags)
 - `POST /api/resumes/:id/impact` - Quantify impact of resume bullets (improve weak bullets)
-- `POST /api/resumes/import-linkedin` - LinkedIn import instructions
 - `POST /api/resumes/:id/send-email` - Log email notification
 
 ### Job Description Endpoints
@@ -139,7 +137,7 @@ The application is started with `npm run dev` which runs both the Express backen
 
 - 2025-01-25: Added nodemailer for sending parsed resume data via email
 - 2025-01-25: Added Extracted Links section to display parsed URLs
-- 2025-01-25: Fixed LinkedIn import UI - now shows clear PDF export instructions
+- 2025-01-25: Removed LinkedIn import feature
 - 2025-01-25: Removed "Powered by Google Gemini AI" branding
 - 2025-01-25: Added Resume Credibility Checker (timeline analysis, overlapping dates, skill mismatches)
 - 2025-01-25: Added Impact Quantification Engine (transforms weak bullets into strong achievements)

@@ -11,7 +11,6 @@ import {
   scoreResume, 
   matchResumeToJob, 
   optimizeKeywords,
-  importFromLinkedIn,
   checkCredibility,
   quantifyImpact
 } from "./utils/resume-parser";
@@ -510,32 +509,6 @@ export async function registerRoutes(
     } catch (error) {
       logger.error(`Keyword optimization failed: ${error}`);
       res.status(500).json({ message: "Failed to optimize keywords" });
-    }
-  });
-
-  // LinkedIn Import
-  app.post("/api/resumes/import-linkedin", async (req: Request, res: Response) => {
-    const { linkedinUrl } = req.body;
-    if (!linkedinUrl || !linkedinUrl.includes("linkedin.com")) {
-      return res.status(400).json({ message: "Valid LinkedIn URL is required" });
-    }
-
-    try {
-      const result = await importFromLinkedIn(linkedinUrl);
-      logger.info(`LinkedIn import guide requested for ${linkedinUrl}`);
-      res.json({
-        success: true,
-        username: result.username,
-        profileUrl: result.profileUrl,
-        message: result.username 
-          ? `Found profile: ${result.username}. Follow the steps below to import your full profile.`
-          : "Follow the steps below to export and import your LinkedIn profile.",
-        instructions: result.instructions,
-        tip: "LinkedIn PDF export includes your complete profile data which our AI can parse accurately."
-      });
-    } catch (error) {
-      logger.error(`LinkedIn import failed: ${error}`);
-      res.status(500).json({ message: "Failed to process LinkedIn URL" });
     }
   });
 

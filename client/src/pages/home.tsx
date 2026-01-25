@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { 
   FileText, Sparkles, Shield, Zap, Target, Search, 
-  TrendingUp, Linkedin, Mail, BarChart3, CheckCircle2
+  TrendingUp, Mail, BarChart3, CheckCircle2
 } from "lucide-react";
 import { UploadDropzone } from "@/components/upload-dropzone";
 import { ProcessingStatus } from "@/components/processing-status";
@@ -182,10 +182,10 @@ export default function Home() {
   ];
 
   const additionalFeatures = [
-    { icon: Linkedin, label: "LinkedIn Import" },
     { icon: Mail, label: "Email Notifications" },
     { icon: BarChart3, label: "7 Score Metrics" },
     { icon: FileText, label: "PDF/DOCX/TXT" },
+    { icon: Shield, label: "Credibility Check" },
   ];
 
   return (

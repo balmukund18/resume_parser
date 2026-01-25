@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { 
   BarChart3, Target, Search, Zap, TrendingUp, 
   AlertCircle, CheckCircle2, Loader2, Info,
-  Linkedin, Mail, ExternalLink, Copy, Shield, Sparkles,
+  Mail, Copy, Shield, Sparkles,
   Clock, ArrowRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -220,10 +220,6 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
             <TabsTrigger value="keywords" className="text-xs px-2 py-2" data-testid="tab-keywords">
               <Zap className="h-4 w-4 sm:mr-1" />
               <span className="hidden sm:inline">ATS</span>
-            </TabsTrigger>
-            <TabsTrigger value="linkedin" className="text-xs px-2 py-2" data-testid="tab-linkedin">
-              <Linkedin className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">LinkedIn</span>
             </TabsTrigger>
             <TabsTrigger value="email" className="text-xs px-2 py-2" data-testid="tab-email">
               <Mail className="h-4 w-4 sm:mr-1" />
@@ -713,57 +709,6 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                 )}
               </div>
             )}
-          </TabsContent>
-
-          <TabsContent value="linkedin" className="space-y-4">
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                <div className="flex items-start gap-3">
-                  <Linkedin className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-blue-900 dark:text-blue-100">Import from LinkedIn Profile</h4>
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      LinkedIn profiles cannot be scraped directly. Follow the steps below to download your profile as PDF and upload it to the parser.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <h4 className="font-semibold flex items-center gap-2">
-                  <Info className="h-4 w-4 text-primary" />
-                  How to Export LinkedIn Profile as PDF
-                </h4>
-                <ol className="space-y-2 text-sm text-muted-foreground">
-                  <li className="flex items-start gap-2">
-                    <span className="font-medium text-foreground">1.</span>
-                    <span>Go to your LinkedIn profile page</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-medium text-foreground">2.</span>
-                    <span>Click the "More" button (three dots) near your profile photo</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-medium text-foreground">3.</span>
-                    <span>Select "Save to PDF" from the dropdown menu</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="font-medium text-foreground">4.</span>
-                    <span>Upload the downloaded PDF file using the upload area on the home page</span>
-                  </li>
-                </ol>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-2"
-                  onClick={() => window.open("https://linkedin.com", "_blank")}
-                  data-testid="button-open-linkedin"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open LinkedIn
-                </Button>
-              </div>
-            </div>
           </TabsContent>
 
           <TabsContent value="email" className="space-y-4">

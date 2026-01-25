@@ -480,32 +480,6 @@ Only return valid JSON.`;
 }
 
 /**
- * Import LinkedIn profile data from a URL - provides instructions
- */
-export async function importFromLinkedIn(linkedinUrl: string): Promise<{ 
-  username: string | null;
-  profileUrl: string;
-  instructions: string[];
-}> {
-  // Extract username from LinkedIn URL
-  const usernameMatch = linkedinUrl.match(/linkedin\.com\/in\/([^\/\?]+)/);
-  const username = usernameMatch ? usernameMatch[1] : null;
-  
-  return {
-    username,
-    profileUrl: linkedinUrl,
-    instructions: [
-      "1. Open your LinkedIn profile in a browser",
-      "2. Click the 'More' button (three dots) near your profile photo",
-      "3. Select 'Save to PDF' from the dropdown menu",
-      "4. Wait for LinkedIn to generate your PDF",
-      "5. Download the PDF and upload it to this resume parser",
-      "6. The parser will extract all your profile data automatically"
-    ]
-  };
-}
-
-/**
  * Check resume credibility - flags overlapping dates, unrealistic timelines, etc.
  */
 export async function checkCredibility(resume: ParsedResume): Promise<CredibilityResult> {
