@@ -3,7 +3,8 @@ import { useMutation } from "@tanstack/react-query";
 import { 
   BarChart3, Target, Search, Zap, TrendingUp, 
   AlertCircle, CheckCircle2, Loader2, Info,
-  Linkedin, Mail, ExternalLink, Copy
+  Linkedin, Mail, ExternalLink, Copy, Shield, Sparkles,
+  Clock, ArrowRight
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,9 @@ import type {
   SkillsGapResult, 
   ResumeScoreResult, 
   JobMatchResult, 
-  KeywordOptimization 
+  KeywordOptimization,
+  CredibilityResult,
+  ImpactQuantificationResult
 } from "@shared/schema";
 
 interface AnalysisPanelProps {
@@ -59,7 +62,11 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
   const [resumeScore, setResumeScore] = useState<ResumeScoreResult | null>(null);
   const [jobMatchResult, setJobMatchResult] = useState<JobMatchResult | null>(null);
   const [keywordResult, setKeywordResult] = useState<KeywordOptimization | null>(null);
+  const [credibilityResult, setCredibilityResult] = useState<CredibilityResult | null>(null);
+  const [impactResult, setImpactResult] = useState<ImpactQuantificationResult | null>(null);
   const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [linkedinInstructions, setLinkedinInstructions] = useState<string[] | null>(null);
+  const [linkedinUsername, setLinkedinUsername] = useState<string | null>(null);
   const [emailAddress, setEmailAddress] = useState("");
   const [includeAnalysis, setIncludeAnalysis] = useState(true);
 
@@ -130,6 +137,34 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
     },
   });
 
+  const credibilityMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/resumes/${resumeId}/credibility`, {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setCredibilityResult(data);
+      toast({ title: "Credibility check complete", description: `Score: ${Math.round(data.credibilityScore)}%` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Credibility check failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const impactMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/resumes/${resumeId}/impact`, {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setImpactResult(data);
+      toast({ title: "Impact analysis complete", description: `Found ${data.weakBulletsCount} bullets to improve` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Impact analysis failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   const linkedinMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/resumes/import-linkedin`, {
@@ -138,6 +173,8 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
       return res.json();
     },
     onSuccess: (data) => {
+      setLinkedinInstructions(data.instructions);
+      setLinkedinUsername(data.username);
       toast({ title: "LinkedIn Import", description: data.message });
     },
     onError: (error: Error) => {
@@ -179,10 +216,18 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="score" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 mb-6 h-auto">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 mb-6 h-auto">
             <TabsTrigger value="score" className="text-xs px-2 py-2" data-testid="tab-score">
               <TrendingUp className="h-4 w-4 sm:mr-1" />
               <span className="hidden sm:inline">Score</span>
+            </TabsTrigger>
+            <TabsTrigger value="credibility" className="text-xs px-2 py-2" data-testid="tab-credibility">
+              <Shield className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Verify</span>
+            </TabsTrigger>
+            <TabsTrigger value="impact" className="text-xs px-2 py-2" data-testid="tab-impact">
+              <Sparkles className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Impact</span>
             </TabsTrigger>
             <TabsTrigger value="skills" className="text-xs px-2 py-2" data-testid="tab-skills">
               <Target className="h-4 w-4 sm:mr-1" />
@@ -249,6 +294,210 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                       {resumeScore.suggestions.map((suggestion, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm">
                           <AlertCircle className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                          {suggestion}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="credibility" className="space-y-4">
+            <div className="text-center space-y-4">
+              <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-start gap-3">
+                  <Shield className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-left">
+                    <h4 className="font-semibold text-amber-900 dark:text-amber-100">Resume Credibility Checker</h4>
+                    <p className="text-sm text-amber-800 dark:text-amber-200">
+                      Analyze for overlapping dates, unrealistic timelines, skill-experience mismatches, and rapid career progression.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <Button 
+                onClick={() => credibilityMutation.mutate()} 
+                disabled={credibilityMutation.isPending}
+                data-testid="button-check-credibility"
+              >
+                {credibilityMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analyzing...</>
+                ) : (
+                  <><Shield className="h-4 w-4 mr-2" /> Check Credibility</>
+                )}
+              </Button>
+            </div>
+            
+            {credibilityResult && (
+              <div className="space-y-6 mt-6" data-testid="credibility-results">
+                <div className="flex justify-center">
+                  <ScoreCircle score={credibilityResult.credibilityScore} label="Credibility Score" size="lg" />
+                </div>
+                
+                <div className="p-4 bg-muted rounded-lg">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Timeline Analysis
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Total Experience</span>
+                      <p className="font-medium">{credibilityResult.timelineAnalysis.totalYearsExperience} years</p>
+                    </div>
+                    {credibilityResult.timelineAnalysis.careerStartYear && (
+                      <div>
+                        <span className="text-muted-foreground">Career Started</span>
+                        <p className="font-medium">{credibilityResult.timelineAnalysis.careerStartYear}</p>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-muted-foreground">Avg. Tenure</span>
+                      <p className="font-medium">{Math.round(credibilityResult.timelineAnalysis.averageTenure)} months</p>
+                    </div>
+                  </div>
+                  {credibilityResult.timelineAnalysis.gaps.length > 0 && (
+                    <div className="mt-3">
+                      <span className="text-sm text-muted-foreground">Employment Gaps:</span>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {credibilityResult.timelineAnalysis.gaps.map((gap, i) => (
+                          <Badge key={i} variant="outline" className="text-xs">
+                            {gap.start} - {gap.end} ({gap.durationMonths} mo)
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {credibilityResult.flags.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
+                      Flags for Review ({credibilityResult.flags.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {credibilityResult.flags.map((flag, i) => (
+                        <div 
+                          key={i} 
+                          className={`p-3 rounded-lg border ${
+                            flag.severity === 'high' ? 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800' :
+                            flag.severity === 'medium' ? 'bg-amber-50 border-amber-200 dark:bg-amber-950 dark:border-amber-800' :
+                            'bg-blue-50 border-blue-200 dark:bg-blue-950 dark:border-blue-800'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <Badge variant="outline" className={`text-xs shrink-0 ${
+                              flag.severity === 'high' ? 'border-red-400 text-red-700' :
+                              flag.severity === 'medium' ? 'border-amber-400 text-amber-700' :
+                              'border-blue-400 text-blue-700'
+                            }`}>
+                              {flag.severity}
+                            </Badge>
+                            <div>
+                              <p className="font-medium text-sm">{flag.message}</p>
+                              {flag.details && (
+                                <p className="text-xs text-muted-foreground mt-1">{flag.details}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="p-4 bg-muted rounded-lg">
+                  <h4 className="font-semibold mb-2">Overall Assessment</h4>
+                  <p className="text-sm text-muted-foreground">{credibilityResult.overallAssessment}</p>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="impact" className="space-y-4">
+            <div className="text-center space-y-4">
+              <div className="p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="h-5 w-5 text-purple-600 shrink-0 mt-0.5" />
+                  <div className="text-left">
+                    <h4 className="font-semibold text-purple-900 dark:text-purple-100">Impact Quantification Engine</h4>
+                    <p className="text-sm text-purple-800 dark:text-purple-200">
+                      Transform weak bullet points into powerful, quantified achievements with strong action verbs.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <Button 
+                onClick={() => impactMutation.mutate()} 
+                disabled={impactMutation.isPending}
+                data-testid="button-quantify-impact"
+              >
+                {impactMutation.isPending ? (
+                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analyzing...</>
+                ) : (
+                  <><Sparkles className="h-4 w-4 mr-2" /> Quantify Impact</>
+                )}
+              </Button>
+            </div>
+            
+            {impactResult && (
+              <div className="space-y-6 mt-6" data-testid="impact-results">
+                <div className="flex justify-center gap-6">
+                  <ScoreCircle score={impactResult.overallImpactScore} label="Impact Score" size="lg" />
+                  <div className="flex flex-col items-center justify-center">
+                    <span className="text-3xl font-bold text-purple-600">{impactResult.weakBulletsCount}</span>
+                    <span className="text-xs text-muted-foreground">Bullets Improved</span>
+                  </div>
+                </div>
+                
+                {impactResult.improvedBullets.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-purple-500" />
+                      Before & After Improvements
+                    </h4>
+                    <div className="space-y-4">
+                      {impactResult.improvedBullets.map((bullet, i) => (
+                        <div key={i} className="p-4 bg-muted rounded-lg space-y-3">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs border-red-300 text-red-600">Before</Badge>
+                                <span className="text-xs text-muted-foreground">{Math.round(bullet.confidenceScore)}% confidence</span>
+                              </div>
+                              <p className="text-sm text-red-700 dark:text-red-300 line-through">{bullet.original}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-center">
+                            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs border-green-300 text-green-600">After</Badge>
+                                <Badge variant="secondary" className="text-xs">{bullet.improvementType.replace(/_/g, ' ')}</Badge>
+                              </div>
+                              <p className="text-sm text-green-700 dark:text-green-300 font-medium">{bullet.improved}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {impactResult.suggestions.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="font-semibold flex items-center gap-2">
+                      <Info className="h-4 w-4 text-primary" />
+                      General Tips
+                    </h4>
+                    <ul className="space-y-2">
+                      {impactResult.suggestions.map((suggestion, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" />
                           {suggestion}
                         </li>
                       ))}

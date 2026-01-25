@@ -32,7 +32,20 @@ function getGeminiClient(): GoogleGenAI {
   throw new Error("No Gemini API key configured. Set GEMINI_API_KEY environment variable.");
 }
 
-const RESUME_PARSING_PROMPT = `You are an expert resume parser. Analyze the following resume text and extract structured information.
+const RESUME_PARSING_PROMPT = `You are an expert resume-parsing and document-analysis AI.
+
+Analyze the following resume text and extract structured information. 
+
+CRITICAL: LINK EXTRACTION IS A FIRST-CLASS FEATURE
+Extract EVERY link found in the document, including:
+- Visible URLs written as text
+- Embedded or hidden hyperlinks (anchor text with URL)
+- Shortened or masked links
+- Profile links: LinkedIn, GitHub, LeetCode, Codeforces, HackerRank, Kaggle, Portfolio, Personal Website
+- Project links: Live demos, GitHub repos, deployed apps, documentation
+- Experience links: Company websites, product pages, tools, platforms
+- Education links: Institution websites, course pages, certificates
+- Certification links: Credential verification or issuer links
 
 Return a JSON object with the following structure:
 {
@@ -42,7 +55,14 @@ Return a JSON object with the following structure:
     "phone": "Phone number or null",
     "address": "Location/address or null",
     "linkedin": "LinkedIn URL or null",
-    "github": "GitHub URL or null"
+    "github": "GitHub URL or null",
+    "portfolio": "Portfolio/personal website URL or null",
+    "leetcode": "LeetCode URL or null",
+    "hackerrank": "HackerRank URL or null",
+    "kaggle": "Kaggle URL or null",
+    "codeforces": "Codeforces URL or null",
+    "twitter": "Twitter/X URL or null",
+    "otherProfiles": ["Array of other profile URLs"]
   },
   "summary": "Professional summary or objective text or null",
   "experience": [
@@ -53,6 +73,7 @@ Return a JSON object with the following structure:
       "endDate": "End date or 'Present' or null",
       "responsibilities": ["List of job responsibilities"],
       "achievements": ["Notable achievements"],
+      "links": ["Any URLs mentioned in this experience entry"],
       "confidenceScore": 0-100
     }
   ],
@@ -62,6 +83,7 @@ Return a JSON object with the following structure:
       "degree": "Degree title",
       "graduationDate": "Graduation date or null",
       "gpa": GPA as number or null,
+      "links": ["Institution website, course links, etc."],
       "confidenceScore": 0-100
     }
   ],
@@ -76,6 +98,8 @@ Return a JSON object with the following structure:
       "description": "Brief description",
       "technologies": ["Technologies used"],
       "url": "Project URL or null",
+      "demoUrl": "Live demo URL or null",
+      "repoUrl": "GitHub/repo URL or null",
       "confidenceScore": 0-100
     }
   ],
@@ -85,6 +109,7 @@ Return a JSON object with the following structure:
       "issuer": "Issuing organization",
       "issueDate": "Issue date or null",
       "expirationDate": "Expiration date or null",
+      "credentialUrl": "Verification/credential URL or null",
       "confidenceScore": 0-100
     }
   ],
@@ -95,6 +120,11 @@ Return a JSON object with the following structure:
       "confidenceScore": 0-100
     }
   ],
+  "links": {
+    "profiles": [{"url": "URL", "anchorText": "text or null", "platform": "LinkedIn/GitHub/etc", "confidenceScore": 0-100}],
+    "projects": [{"url": "URL", "anchorText": "text or null", "projectName": "if identifiable", "confidenceScore": 0-100}],
+    "additional": [{"url": "URL", "anchorText": "text or null", "context": "where found", "confidenceScore": 0-100}]
+  },
   "detectedLanguage": "en or es (detected language of resume)"
 }
 
@@ -108,6 +138,9 @@ IMPORTANT:
 - Dates should be in YYYY-MM-DD or YYYY-MM or YYYY format when possible
 - Extract as much relevant information as possible
 - Be thorough but accurate - only include information that is clearly in the resume
+- Deduplicate links and normalize URLs (use https, remove tracking parameters)
+- Do NOT hallucinate or infer links that are not explicitly present
+- Link extraction must be treated as a FIRST-CLASS feature - missing links is a parsing failure
 
 RESUME TEXT:
 `;
