@@ -50,18 +50,33 @@ export function validateMimeType(mimeType: string, fileType: SupportedFileType):
 async function extractFromPdf(filePath: string): Promise<ExtractionResult> {
   logger.info(`Extracting text from PDF: ${filePath}`);
   
-  // Dynamic import to handle ESM/CJS compatibility
-  const pdfParseModule = await import("pdf-parse");
-  const pdfParse = pdfParseModule.default || pdfParseModule;
+  // Use pdfjs-dist directly for reliable PDF text extraction
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
   
   const dataBuffer = fs.readFileSync(filePath);
-  const data = await pdfParse(dataBuffer);
+  const uint8Array = new Uint8Array(dataBuffer);
   
-  logger.info(`Extracted ${data.numpages} pages from PDF`);
+  const doc = await pdfjsLib.getDocument({ data: uint8Array }).promise;
+  const numPages = doc.numPages;
+  
+  // Extract text from all pages
+  const textParts: string[] = [];
+  for (let i = 1; i <= numPages; i++) {
+    const page = await doc.getPage(i);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items
+      .map((item: any) => item.str)
+      .join(" ");
+    textParts.push(pageText);
+  }
+  
+  const text = textParts.join("\n\n");
+  
+  logger.info(`Extracted ${numPages} pages from PDF`);
   
   return {
-    text: data.text,
-    pageCount: data.numpages,
+    text,
+    pageCount: numPages,
   };
 }
 
