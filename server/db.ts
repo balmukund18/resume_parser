@@ -8,8 +8,16 @@ const { Pool } = pg;
 const logger = createModuleLogger("Database");
 
 if (!process.env.DATABASE_URL) {
+  const isProduction = process.env.NODE_ENV === "production";
+  const deploymentHint = isProduction
+    ? "\n\n🚨 For Railway: Add PostgreSQL database in Railway dashboard, then set:\n" +
+      "   DATABASE_URL=${{Postgres.DATABASE_URL}}\n" +
+      "   in your service's Variables tab.\n\n" +
+      "   See RAILWAY_DEPLOYMENT.md for detailed instructions."
+    : "\n\nDid you forget to provision a database?";
+  
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    `DATABASE_URL must be set.${deploymentHint}`
   );
 }
 

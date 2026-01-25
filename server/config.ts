@@ -42,9 +42,21 @@ export function validateEnvironment(): void {
   if (missing.length > 0) {
     logger.error("Missing required environment variables:");
     missing.forEach(key => logger.error(`  - ${key}`));
+    
+    // Provide helpful deployment-specific error message
+    const isProduction = process.env.NODE_ENV === "production";
+    const deploymentHint = isProduction
+      ? "\n\n🚨 DEPLOYMENT ERROR: Environment variables not set!\n" +
+        "For Railway: Go to your service → Variables tab → Add missing variables\n" +
+        "For Render: Go to your service → Environment → Add missing variables\n" +
+        "For Fly.io: Use 'fly secrets set KEY=value' command\n\n" +
+        "Required variables:\n" +
+        missing.map(key => `  - ${key}`).join("\n") +
+        "\n\nSee RAILWAY_DEPLOYMENT.md for detailed setup instructions."
+      : "\n\nPlease check your .env file or environment configuration.";
+    
     throw new Error(
-      `Missing required environment variables: ${missing.join(", ")}\n` +
-      "Please check your .env file or environment configuration."
+      `Missing required environment variables: ${missing.join(", ")}${deploymentHint}`
     );
   }
 
