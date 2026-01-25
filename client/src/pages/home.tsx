@@ -291,33 +291,6 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="bg-card border rounded-lg p-6 max-w-2xl mx-auto" data-testid="api-key-notice">
-              <div className="flex items-start gap-4">
-                <div className="p-2 bg-amber-500/10 rounded-lg shrink-0">
-                  <Zap className="h-5 w-5 text-amber-500" />
-                </div>
-                <div className="space-y-2">
-                  <h4 className="font-semibold">Gemini API Key Required</h4>
-                  <p className="text-sm text-muted-foreground">
-                    This app uses Google Gemini AI for resume parsing. Add your API key as the 
-                    <code className="mx-1 px-1.5 py-0.5 bg-muted rounded text-xs">GEMINI_API_KEY</code>
-                    environment variable to get started.
-                  </p>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <a 
-                      href="https://aistudio.google.com/app/apikey" 
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-                      data-testid="link-get-api-key"
-                    >
-                      <CheckCircle2 className="h-3 w-3" />
-                      Get free API key
-                    </a>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
