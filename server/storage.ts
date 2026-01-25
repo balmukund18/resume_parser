@@ -27,6 +27,7 @@ export interface IStorage {
   // Resume operations
   createResume(data: InsertResume): Promise<Resume>;
   getResume(id: string): Promise<Resume | undefined>;
+  getParsedResume(id: string): Promise<ParsedResume | undefined>;
   getAllResumes(): Promise<Resume[]>;
   deleteResume(id: string): Promise<boolean>;
   
@@ -67,6 +68,12 @@ export class DatabaseStorage implements IStorage {
     return resume || undefined;
   }
 
+  async getParsedResume(id: string): Promise<ParsedResume | undefined> {
+    const resume = await this.getResume(id);
+    if (!resume) return undefined;
+    return this.resumeToParsedResume(resume);
+  }
+
   async getAllResumes(): Promise<Resume[]> {
     return await db.select().from(resumes).orderBy(desc(resumes.createdAt));
   }
@@ -97,7 +104,7 @@ export class DatabaseStorage implements IStorage {
     if (job.status === "completed" && job.resumeId) {
       const resume = await this.getResume(job.resumeId);
       if (resume) {
-        result = this.resumeToParsdResume(resume);
+        result = this.resumeToParsedResume(resume);
       }
     }
     
@@ -282,7 +289,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  private resumeToParsdResume(resume: Resume): ParsedResume {
+  private resumeToParsedResume(resume: Resume): ParsedResume {
     return {
       id: resume.id,
       name: resume.name,

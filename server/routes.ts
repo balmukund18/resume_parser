@@ -422,17 +422,17 @@ export async function registerRoutes(
     }
 
     try {
-      const job = await storage.getJob(req.params.id);
-      if (!job || !job.result) {
-        return res.status(404).json({ message: "Resume not found or not processed" });
+      const parsedResume = await storage.getParsedResume(req.params.id);
+      if (!parsedResume) {
+        return res.status(404).json({ message: "Resume not found" });
       }
 
-      const result = await scoreResume(job.result);
+      const result = await scoreResume(parsedResume);
       
       // Save score
-      await storage.saveResumeScore(job.result.id, result);
+      await storage.saveResumeScore(req.params.id, result);
 
-      logger.info(`Resume scoring completed for ${job.result.id}`);
+      logger.info(`Resume scoring completed for ${req.params.id}`);
       res.json(result);
     } catch (error) {
       logger.error(`Resume scoring failed: ${error}`);
@@ -453,9 +453,9 @@ export async function registerRoutes(
     }
 
     try {
-      const job = await storage.getJob(req.params.id);
-      if (!job || !job.result) {
-        return res.status(404).json({ message: "Resume not found or not processed" });
+      const parsedResume = await storage.getParsedResume(req.params.id);
+      if (!parsedResume) {
+        return res.status(404).json({ message: "Resume not found" });
       }
 
       // Create job description record
@@ -468,12 +468,12 @@ export async function registerRoutes(
         keywords: [],
       });
 
-      const result = await matchResumeToJob(job.result, { title, company, description });
+      const result = await matchResumeToJob(parsedResume, { title, company, description });
       
       // Save match
-      await storage.saveJobMatch(job.result.id, jobDesc.id, result);
+      await storage.saveJobMatch(req.params.id, jobDesc.id, result);
 
-      logger.info(`Job matching completed for resume ${job.result.id}`);
+      logger.info(`Job matching completed for resume ${req.params.id}`);
       res.json(result);
     } catch (error) {
       logger.error(`Job matching failed: ${error}`);
@@ -491,18 +491,18 @@ export async function registerRoutes(
     const { title, description } = req.body as Partial<JobDescriptionInput>;
 
     try {
-      const job = await storage.getJob(req.params.id);
-      if (!job || !job.result) {
-        return res.status(404).json({ message: "Resume not found or not processed" });
+      const parsedResume = await storage.getParsedResume(req.params.id);
+      if (!parsedResume) {
+        return res.status(404).json({ message: "Resume not found" });
       }
 
       const targetJob = title && description ? { title, description } : undefined;
-      const result = await optimizeKeywords(job.result, targetJob);
+      const result = await optimizeKeywords(parsedResume, targetJob);
       
       // Save recommendations
-      await storage.saveKeywordRecommendations(job.result.id, null, result);
+      await storage.saveKeywordRecommendations(req.params.id, null, result);
 
-      logger.info(`Keyword optimization completed for resume ${job.result.id}`);
+      logger.info(`Keyword optimization completed for resume ${req.params.id}`);
       res.json(result);
     } catch (error) {
       logger.error(`Keyword optimization failed: ${error}`);
@@ -548,25 +548,25 @@ export async function registerRoutes(
     }
 
     try {
-      const job = await storage.getJob(req.params.id);
-      if (!job || !job.result) {
-        return res.status(404).json({ message: "Resume not found or not processed" });
+      const parsedResume = await storage.getParsedResume(req.params.id);
+      if (!parsedResume) {
+        return res.status(404).json({ message: "Resume not found" });
       }
 
       // Log the notification attempt
       await storage.logEmailNotification(
-        job.result.id,
+        req.params.id,
         email,
-        `Resume Analysis Results - ${job.result.name}`,
+        `Resume Analysis Results - ${parsedResume.name}`,
         "pending"
       );
 
       // Note: Actual email sending requires email service integration
-      logger.info(`Email notification logged for resume ${job.result.id} to ${email}`);
+      logger.info(`Email notification logged for resume ${req.params.id} to ${email}`);
       res.json({
         message: "Email notification queued. Note: Email service requires configuration.",
         email,
-        resumeId: job.result.id,
+        resumeId: req.params.id,
         includeAnalysis: includeAnalysis || false,
         status: "Email service not configured. To enable, set up SendGrid or Resend integration."
       });

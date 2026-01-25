@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConfidenceBadge } from "./confidence-badge";
+import { AnalysisPanel } from "./analysis-panel";
 import type { ParsedResume, ExportFormat } from "@shared/schema";
 
 interface ResumeResultsProps {
@@ -399,6 +400,9 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
           </div>
         </CardContent>
       </Card>
+
+      {/* AI Analysis Tools */}
+      <AnalysisPanel resumeId={resume.id} />
     </div>
   );
 }
