@@ -1,0 +1,581 @@
+# Product Requirements Document (PRD)
+## Resume Parser Application
+
+**Version:** 1.0  
+**Date:** January 25, 2026  
+**Product Manager:** [Your Name]  
+**Engineering Lead:** [Engineering Lead Name]
+
+---
+
+## 1. Executive Summary & Overview
+
+### Product Vision
+Create a comprehensive AI-powered resume parsing platform that extracts, structures, and validates resume data from multiple file formats, providing businesses and HR teams with accurate, structured candidate information for streamlined hiring processes.
+
+### Problem Statement
+Current resume parsing solutions suffer from:
+- Poor accuracy in extracting structured data
+- Limited file format support
+- No confidence scoring for extracted information
+- Inability to handle multilingual content
+- Poor user experience for reviewing/editing extracted data
+
+### Solution Overview
+A modern web-based resume parser using:
+- **Backend:** Node.js with Express.js
+- **Frontend:** React with Tailwind CSS
+- **AI Engine:** Google Gemini API for intelligent extraction
+- **Architecture:** Microservices with RESTful APIs
+- **Storage:** File system + database for metadata and audit logs
+
+---
+
+## 2. Goals & Non-Goals
+
+### Goals
+- **Primary Goals:**
+  - Parse PDF, DOCX, and TXT resume files with 90%+ accuracy
+  - Support English and Spanish languages (Phase 1)
+  - Provide confidence scores for each extracted field
+  - Enable user editing of extracted data before export
+  - Deliver sub-10 second processing time for typical resumes
+  - Ensure GDPR and data privacy compliance
+
+- **Secondary Goals:**
+  - Admin dashboard for usage analytics
+  - Bulk processing capabilities
+  - Export to multiple formats (JSON, CSV, ATS integration)
+  - Mobile-responsive interface
+
+### Non-Goals (Phase 1)
+- Real-time parsing (async processing is acceptable)
+- Advanced OCR for scanned documents
+- Integration with ATS systems (Phase 2)
+- Video or audio resume parsing
+- Advanced analytics/ML insights beyond confidence scoring
+
+---
+
+## 3. User Personas
+
+### Primary Persona: HR Recruiter (Sarah)
+- **Role:** Senior HR Recruiter at mid-size company
+- **Pain Points:** Manually reviewing 50+ resumes daily, inconsistent data format
+- **Goals:** Quickly extract candidate info, reduce manual data entry
+- **Tech Comfort:** Moderate; prefers intuitive interfaces
+
+### Secondary Persona: Technical Recruiter (Mike)
+- **Role:** Technical recruiting specialist
+- **Pain Points:** Need to extract specific technical skills accurately
+- **Goals:** Identify relevant technical experience and skills
+- **Tech Comfort:** High; comfortable with APIs and integrations
+
+### Tertiary Persona: Small Business Owner (Lisa)
+- **Role:** Startup founder handling hiring
+- **Pain Points:** Limited time, need simple solution
+- **Goals:** Quick candidate screening, cost-effective solution
+- **Tech Comfort:** Basic; needs simple, self-service interface
+
+---
+
+## 4. User Stories & Use Cases
+
+### Epic 1: File Upload & Processing
+- **US-001:** As a recruiter, I want to upload resume files via drag-and-drop so that I can quickly start the parsing process
+- **US-002:** As a user, I want to see upload progress and file validation so that I know the system is working
+- **US-003:** As a user, I want to receive error messages for unsupported files so that I can correct issues
+
+### Epic 2: Data Extraction & Display
+- **US-004:** As a recruiter, I want to see extracted resume data in a structured format so that I can quickly review candidate information
+- **US-005:** As a user, I want to see confidence scores for each field so that I can identify potential errors
+- **US-006:** As a user, I want to edit extracted fields so that I can correct any parsing errors
+
+### Epic 3: Export & Integration
+- **US-007:** As a recruiter, I want to export parsed data as JSON so that I can integrate with our ATS
+- **US-008:** As a user, I want to export data as CSV so that I can use it in spreadsheet applications
+
+### Epic 4: Administration
+- **US-009:** As an admin, I want to view usage analytics so that I can monitor system performance
+- **US-010:** As an admin, I want to see error logs so that I can troubleshoot issues
+
+---
+
+## 5. Functional Requirements
+
+### 5.1 File Processing
+- **FP-001:** Support file formats: PDF, DOCX, TXT
+- **FP-002:** File size limit: 10MB maximum
+- **FP-003:** Validate file types and reject unsupported formats
+- **FP-004:** Extract text content while preserving formatting context
+- **FP-005:** Handle corrupted or password-protected files gracefully
+
+### 5.2 AI Extraction Engine
+- **FP-006:** Use Google Gemini API for structured data extraction
+- **FP-007:** Support English and Spanish languages
+- **FP-008:** Generate confidence scores (0-100%) for each extracted field
+- **FP-009:** Validate extracted data against predefined schema
+- **FP-010:** Handle parsing retries (max 3 attempts) for failed extractions
+
+### 5.3 Data Schema
+Extract the following structured data:
+- **Personal Information:** Name, email, phone, address, LinkedIn, GitHub
+- **Summary/Objective:** Professional summary text
+- **Work Experience:** Company, position, start/end dates, responsibilities, achievements
+- **Education:** Institution, degree, graduation date, GPA (if available)
+- **Skills:** Technical and soft skills (categorized)
+- **Projects:** Project name, description, technologies, URLs
+- **Certifications:** Name, issuer, date, expiration
+- **Languages:** Language and proficiency level
+
+### 5.4 User Interface
+- **FP-011:** Responsive design supporting desktop and tablet (mobile Phase 2)
+- **FP-012:** Real-time editing of extracted fields with inline validation
+- **FP-013:** Side-by-side view of original resume and extracted data
+- **FP-014:** Export options with preview functionality
+- **FP-015:** Progress indicators for long-running operations
+
+### 5.5 Data Management
+- **FP-016:** Store uploaded files temporarily (24-hour retention)
+- **FP-017:** Log all parsing operations with metadata
+- **FP-018:** Audit trail for all user edits
+- **FP-019:** Secure deletion of processed files
+
+---
+
+## 6. Non-Functional Requirements
+
+### 6.1 Performance
+- **NFR-001:** Parse typical resume (2-4 pages) in <10 seconds
+- **NFR-002:** Support 100 concurrent users
+- **NFR-003:** 99.5% uptime SLA
+- **NFR-004:** API response time <2 seconds for non-parsing operations
+
+### 6.2 Scalability
+- **NFR-005:** Horizontal scaling capability for processing workers
+- **NFR-006:** Database capable of handling 10,000+ parsing records
+- **NFR-007:** File storage with auto-cleanup mechanisms
+
+### 6.3 Security & Privacy
+- **NFR-008:** HTTPS encryption for all communications
+- **NFR-009:** Input validation and sanitization
+- **NFR-010:** Rate limiting: 50 requests/hour per IP
+- **NFR-011:** No permanent storage of resume content (compliance)
+- **NFR-012:** Audit logging for all file operations
+
+### 6.4 Reliability
+- **NFR-013:** Graceful error handling with user-friendly messages
+- **NFR-014:** Automatic retry logic for temporary failures
+- **NFR-015:** Health check endpoints for monitoring
+
+---
+
+## 7. Data Schema & Models
+
+### 7.1 Resume Data Model
+```json
+{
+  "id": "uuid",
+  "name": "string",
+  "contactInfo": {
+    "email": "string",
+    "phone": "string", 
+    "address": "string",
+    "linkedin": "string",
+    "github": "string"
+  },
+  "summary": "string",
+  "experience": [{
+    "company": "string",
+    "position": "string",
+    "startDate": "YYYY-MM-DD",
+    "endDate": "YYYY-MM-DD",
+    "responsibilities": ["string"],
+    "achievements": ["string"],
+    "confidenceScore": "number"
+  }],
+  "education": [{
+    "institution": "string",
+    "degree": "string",
+    "graduationDate": "YYYY-MM-DD",
+    "gpa": "number",
+    "confidenceScore": "number"
+  }],
+  "skills": {
+    "technical": ["string"],
+    "soft": ["string"],
+    "confidenceScore": "number"
+  },
+  "projects": [{
+    "name": "string",
+    "description": "string",
+    "technologies": ["string"],
+    "url": "string",
+    "confidenceScore": "number"
+  }],
+  "certifications": [{
+    "name": "string",
+    "issuer": "string",
+    "issueDate": "YYYY-MM-DD",
+    "expirationDate": "YYYY-MM-DD",
+    "confidenceScore": "number"
+  }],
+  "languages": [{
+    "language": "string",
+    "proficiency": "string",
+    "confidenceScore": "number"
+  }],
+  "metadata": {
+    "originalFilename": "string",
+    "fileType": "string",
+    "processingTime": "number",
+    "overallConfidence": "number",
+    "language": "string"
+  }
+}
+```
+
+### 7.2 Processing Metadata
+```json
+{
+  "processingId": "uuid",
+  "filename": "string",
+  "fileSize": "number",
+  "uploadTimestamp": "timestamp",
+  "processingStartTime": "timestamp", 
+  "processingEndTime": "timestamp",
+  "status": "pending|processing|completed|failed",
+  "errorMessage": "string",
+  "geminiModel": "string",
+  "geminiTokensUsed": "number",
+  "userEdits": "number"
+}
+```
+
+---
+
+## 8. API Design
+
+### 8.1 Core Endpoints
+
+#### Upload & Parse
+```
+POST /api/v1/resumes/upload
+- Multipart file upload
+- Returns processing ID
+- Initiates async parsing
+
+GET /api/v1/resumes/{id}/status  
+- Check processing status
+- Returns current state + progress
+
+GET /api/v1/resumes/{id}
+- Retrieve parsed resume data
+- Includes confidence scores
+```
+
+#### Data Management
+```
+PUT /api/v1/resumes/{id}
+- Update parsed data (user edits)
+- Validate against schema
+- Track edit history
+
+POST /api/v1/resumes/{id}/export
+- Export in specified format
+- Support JSON, CSV formats
+
+DELETE /api/v1/resumes/{id}
+- Secure deletion of all data
+```
+
+#### Administrative
+```
+GET /api/v1/admin/stats
+- Usage statistics
+- Performance metrics
+
+GET /api/v1/admin/logs
+- Processing logs
+- Error tracking
+```
+
+### 8.2 Error Codes
+- **400:** Invalid file format/size
+- **409:** File already processing
+- **413:** File too large
+- **422:** Parsing failed after retries
+- **429:** Rate limit exceeded
+- **500:** Internal processing error
+
+---
+
+## 9. UI/UX Requirements
+
+### 9.1 Design Principles
+- **Clean & Minimal:** Focus on functionality over decoration
+- **Accessibility:** WCAG 2.1 AA compliance
+- **Progressive Disclosure:** Show details on demand
+- **Immediate Feedback:** Real-time status updates
+
+### 9.2 Key Screens
+
+#### Upload Screen
+- Large drop zone with clear visual feedback
+- File validation with helpful error messages
+- Progress indicator during upload
+- Support for multiple file selection (Phase 2)
+
+#### Processing Status
+- Clear progress indicators
+- Estimated time remaining
+- Ability to cancel processing
+
+#### Results Screen
+- Split view: original document preview + extracted data
+- Confidence score indicators with color coding:
+  - Green (90-100%): High confidence
+  - Yellow (70-89%): Medium confidence  
+  - Red (<70%): Low confidence, review needed
+- Inline editing with form validation
+- Expandable sections for detailed data
+
+#### Export Screen
+- Format selection with previews
+- Download progress tracking
+- Share/send options
+
+### 9.3 Responsive Design
+- **Desktop (1200px+):** Full split-screen layout
+- **Tablet (768-1199px):** Stacked layout with scrolling
+- **Mobile (Phase 2):** Mobile-first simplified interface
+
+---
+
+## 10. Analytics & Monitoring
+
+### 10.1 Key Metrics
+- **Usage Metrics:**
+  - Files processed per day/week
+  - Average processing time
+  - User engagement (edits per session)
+  - Export format preferences
+
+- **Quality Metrics:**
+  - Overall confidence scores by section
+  - User edit frequency by field
+  - Processing success rate
+  - File format performance
+
+- **Performance Metrics:**
+  - API response times
+  - Gemini API latency
+  - Error rates by type
+  - System resource utilization
+
+### 10.2 Monitoring & Alerting
+- Real-time error tracking
+- Performance threshold alerts
+- Cost monitoring for Gemini API usage
+- Uptime monitoring with external service
+
+---
+
+## 11. Security & Privacy
+
+### 11.1 Data Privacy
+- **Data Retention:** 24 hours maximum for uploaded files
+- **Data Minimization:** Only extract necessary information
+- **User Control:** Allow immediate data deletion
+- **Compliance:** GDPR Article 17 (Right to Erasure)
+
+### 11.2 Security Measures
+- Input validation and sanitization
+- File type verification (not just extension)
+- Rate limiting per IP and user session
+- HTTPS enforcement
+- Secure headers (HSTS, CSP, etc.)
+- Regular security audits
+
+### 11.3 Access Control
+- Session-based authentication
+- Role-based access for admin functions
+- API key authentication for integrations (Phase 2)
+
+---
+
+## 12. Dependencies & Integrations
+
+### 12.1 External Services
+- **Google Gemini API:** Primary AI processing engine
+- **File Storage:** Local filesystem with backup strategy
+- **Monitoring:** Application monitoring service
+- **Error Tracking:** Error logging and alerting
+
+### 12.2 Technology Stack
+```
+Frontend:
+├── React 18+
+├── Tailwind CSS 3+
+├── TypeScript
+├── React Router
+├── Axios for API calls
+└── React Hook Form
+
+Backend:
+├── Node.js 18+
+├── Express.js
+├── TypeScript
+├── Multer (file uploads)
+├── Joi (validation)
+├── Winston (logging)
+└── Rate limiting middleware
+
+AI & Processing:
+├── Google Gemini API
+├── PDF parsing libraries
+├── DOCX parsing libraries
+└── Text processing utilities
+
+Infrastructure:
+├── Docker containers
+├── Environment-based configuration
+├── Health check endpoints
+└── Graceful shutdown handling
+```
+
+---
+
+## 13. Risk Assessment & Mitigation
+
+### 13.1 High-Risk Items
+| Risk | Impact | Probability | Mitigation Strategy |
+|------|--------|-------------|-------------------|
+| Gemini API rate limits/costs | High | Medium | Implement caching, request batching, cost monitoring |
+| Poor parsing accuracy | High | Medium | Extensive testing, confidence scoring, user feedback loop |
+| Data privacy violations | High | Low | Strict data retention policies, audit logging |
+| Performance under load | Medium | Medium | Load testing, horizontal scaling architecture |
+
+### 13.2 Technical Risks
+- **File Format Compatibility:** Regular testing with diverse resume formats
+- **Language Detection:** Robust language identification algorithms
+- **Model Drift:** Monitor Gemini API changes and adapt accordingly
+- **Scaling Bottlenecks:** Design for horizontal scaling from day one
+
+### 13.3 Business Risks
+- **API Cost Overrun:** Implement cost caps and usage alerts
+- **User Adoption:** Focus on UX testing and feedback integration
+- **Competition:** Differentiate through accuracy and user experience
+
+---
+
+## 14. Development Milestones & Timeline
+
+### Phase 1: MVP (8-10 weeks)
+**Week 1-2: Foundation**
+- [ ] Project setup and architecture
+- [ ] Basic Node.js/Express backend
+- [ ] React frontend with Tailwind setup
+- [ ] File upload infrastructure
+
+**Week 3-4: Core Processing**
+- [ ] File readers (PDF, DOCX, TXT)
+- [ ] Gemini API integration
+- [ ] Basic parsing pipeline
+- [ ] Data validation schema
+
+**Week 5-6: User Interface** 
+- [ ] Upload interface with progress tracking
+- [ ] Results display with confidence scores
+- [ ] Basic editing capabilities
+- [ ] Export functionality
+
+**Week 7-8: Polish & Testing**
+- [ ] Error handling and user feedback
+- [ ] Performance optimization
+- [ ] Security implementation
+- [ ] User acceptance testing
+
+**Week 9-10: Launch Preparation**
+- [ ] Documentation and deployment
+- [ ] Monitoring and alerting setup
+- [ ] Production testing
+- [ ] Go-live
+
+### Phase 2: Enhanced Features (4-6 weeks)
+- [ ] Advanced admin dashboard
+- [ ] Bulk processing capabilities
+- [ ] Additional language support
+- [ ] Mobile responsive design
+- [ ] ATS integration APIs
+- [ ] Advanced analytics
+
+### Phase 3: Scale & Optimize (Ongoing)
+- [ ] Performance optimization
+- [ ] Advanced AI features
+- [ ] Enterprise features
+- [ ] Third-party integrations
+
+---
+
+## 15. Success Criteria & KPIs
+
+### 15.1 MVP Success Metrics
+- **Functionality:** 90%+ parsing accuracy for standard resumes
+- **Performance:** <10 second processing time for typical resumes
+- **Usability:** User can complete upload-to-export flow in <3 minutes
+- **Reliability:** 99%+ uptime during beta testing
+- **User Satisfaction:** >4.0/5.0 user rating
+
+### 15.2 Post-Launch KPIs
+- **Growth:** 100 active users within first month
+- **Engagement:** 70%+ of users complete full parsing workflow
+- **Quality:** <10% user edit rate on extracted data
+- **Performance:** 95th percentile processing time <15 seconds
+- **Cost Efficiency:** Gemini API costs <$0.50 per resume
+
+### 15.3 Success Definition
+The MVP will be considered successful when:
+1. Users can reliably parse common resume formats
+2. Extracted data accuracy meets or exceeds 90% for key fields
+3. User experience is intuitive and efficient
+4. System performance meets SLA requirements
+5. Foundation is ready for Phase 2 enhancements
+
+---
+
+## Appendices
+
+### A. Current Codebase Analysis
+The existing Python-based system provides:
+- Solid parsing pipeline architecture
+- OpenAI integration patterns (adaptable to Gemini)
+- Comprehensive data schema
+- File processing capabilities
+- Basic web interface foundation
+
+**Key components to leverage:**
+- Data schema design (adapted for Gemini output)
+- File processing logic patterns
+- Error handling approaches
+- Configuration management patterns
+
+### B. Migration Strategy
+- **Phase 1:** Build new Node.js/React system alongside existing
+- **Phase 2:** Migrate core parsing logic and test in parallel
+- **Phase 3:** Switch traffic to new system
+- **Phase 4:** Sunset Python system
+
+### C. Technology Decision Rationale
+- **Node.js Backend:** Better ecosystem for modern web APIs, TypeScript support
+- **React Frontend:** Component-based architecture, excellent Tailwind integration
+- **Gemini API:** Cost-effective alternative to OpenAI with comparable capabilities
+- **Tailwind CSS:** Rapid UI development, consistent design system
+
+---
+
+**Document Control:**
+- **Created:** January 25, 2026
+- **Last Modified:** January 25, 2026  
+- **Next Review:** February 15, 2026
+- **Approval:** [Pending stakeholder review]
