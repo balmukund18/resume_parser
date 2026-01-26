@@ -191,21 +191,23 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <FileText className="h-6 w-6 text-primary" />
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="p-1.5 sm:p-2 bg-primary/10 rounded-lg shrink-0">
+              <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
-            <div>
-              <h1 className="font-bold text-lg">Resume Parser</h1>
-              <p className="text-xs text-muted-foreground">AI-Powered Analysis</p>
+            <div className="min-w-0">
+              <h1 className="font-bold text-base sm:text-lg truncate">Resume Parser</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">AI-Powered Analysis</p>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="shrink-0">
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 flex-1">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-1">
         {viewState === "upload" && (
           <div className="space-y-12">
             <div className="text-center space-y-4 max-w-3xl mx-auto">
@@ -213,11 +215,11 @@ export default function Home() {
                 <Sparkles className="h-3 w-3 mr-1" />
                 AI-Powered Resume Analysis
               </Badge>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight px-4">
                 Transform Resumes into
                 <span className="text-primary"> Actionable Insights</span>
               </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4">
                 Upload a resume and get structured data extraction, skills analysis, 
                 job matching, ATS optimization, and more - all powered by AI.
               </p>
@@ -240,7 +242,7 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto" data-testid="features-grid">
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-5xl mx-auto px-4" data-testid="features-grid">
               {features.map((feature, i) => (
                 <div 
                   key={i}
@@ -258,9 +260,9 @@ export default function Home() {
               ))}
             </div>
 
-            <div className="text-center space-y-4 pt-8 border-t max-w-2xl mx-auto">
-              <h3 className="font-semibold text-lg">How It Works</h3>
-              <div className="grid sm:grid-cols-3 gap-6">
+            <div className="text-center space-y-4 pt-6 sm:pt-8 border-t max-w-2xl mx-auto px-4">
+              <h3 className="font-semibold text-base sm:text-lg">How It Works</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                 <div className="space-y-2">
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
                     <span className="text-primary font-bold">1</span>
@@ -313,8 +315,8 @@ export default function Home() {
         )}
       </main>
 
-      <footer className="border-t py-6 mt-auto">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+      <footer className="border-t py-4 sm:py-6 mt-auto">
+        <div className="container mx-auto px-4 sm:px-6 text-center text-xs sm:text-sm text-muted-foreground">
           <p>Resume Parser - AI-Powered Resume Analysis</p>
           <p className="text-xs mt-1">Files are processed securely and deleted after 24 hours.</p>
         </div>

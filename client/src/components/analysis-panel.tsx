@@ -196,33 +196,33 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="score" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 mb-6 h-auto">
-            <TabsTrigger value="score" className="text-xs px-2 py-2" data-testid="tab-score">
-              <TrendingUp className="h-4 w-4 sm:mr-1" />
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 mb-4 sm:mb-6 h-auto overflow-x-auto">
+            <TabsTrigger value="score" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-score">
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
               <span className="hidden sm:inline">Score</span>
             </TabsTrigger>
-            <TabsTrigger value="credibility" className="text-xs px-2 py-2" data-testid="tab-credibility">
-              <Shield className="h-4 w-4 sm:mr-1" />
+            <TabsTrigger value="credibility" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-credibility">
+              <Shield className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
               <span className="hidden sm:inline">Verify</span>
             </TabsTrigger>
-            <TabsTrigger value="impact" className="text-xs px-2 py-2" data-testid="tab-impact">
-              <Sparkles className="h-4 w-4 sm:mr-1" />
+            <TabsTrigger value="impact" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-impact">
+              <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
               <span className="hidden sm:inline">Impact</span>
             </TabsTrigger>
-            <TabsTrigger value="skills" className="text-xs px-2 py-2" data-testid="tab-skills">
-              <Target className="h-4 w-4 sm:mr-1" />
+            <TabsTrigger value="skills" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-skills">
+              <Target className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
               <span className="hidden sm:inline">Skills</span>
             </TabsTrigger>
-            <TabsTrigger value="match" className="text-xs px-2 py-2" data-testid="tab-match">
-              <Search className="h-4 w-4 sm:mr-1" />
+            <TabsTrigger value="match" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-match">
+              <Search className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
               <span className="hidden sm:inline">Match</span>
             </TabsTrigger>
-            <TabsTrigger value="keywords" className="text-xs px-2 py-2" data-testid="tab-keywords">
-              <Zap className="h-4 w-4 sm:mr-1" />
+            <TabsTrigger value="keywords" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-keywords">
+              <Zap className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
               <span className="hidden sm:inline">ATS</span>
             </TabsTrigger>
-            <TabsTrigger value="email" className="text-xs px-2 py-2" data-testid="tab-email">
-              <Mail className="h-4 w-4 sm:mr-1" />
+            <TabsTrigger value="email" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-email">
+              <Mail className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
               <span className="hidden sm:inline">Email</span>
             </TabsTrigger>
           </TabsList>
@@ -251,7 +251,7 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                   <ScoreCircle score={resumeScore.overallScore} label="Overall Score" size="lg" />
                 </div>
                 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                   <ScoreCircle score={resumeScore.completenessScore} label="Completeness" size="sm" />
                   <ScoreCircle score={resumeScore.keywordScore} label="Keywords" size="sm" />
                   <ScoreCircle score={resumeScore.formattingScore} label="Formatting" size="sm" />
@@ -282,12 +282,12 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
 
           <TabsContent value="credibility" className="space-y-4">
             <div className="text-center space-y-4">
-              <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
-                <div className="flex items-start gap-3">
-                  <Shield className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div className="text-left">
-                    <h4 className="font-semibold text-amber-900 dark:text-amber-100">Resume Credibility Checker</h4>
-                    <p className="text-sm text-amber-800 dark:text-amber-200">
+              <div className="p-3 sm:p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-left min-w-0">
+                    <h4 className="font-semibold text-xs sm:text-sm text-amber-900 dark:text-amber-100">Resume Credibility Checker</h4>
+                    <p className="text-xs sm:text-sm text-amber-800 dark:text-amber-200 break-words">
                       Analyze for overlapping dates, unrealistic timelines, skill-experience mismatches, and rapid career progression.
                     </p>
                   </div>
@@ -317,19 +317,19 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                     <Clock className="h-4 w-4" />
                     Timeline Analysis
                   </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 text-xs sm:text-sm">
                     <div>
-                      <span className="text-muted-foreground">Total Experience</span>
+                      <span className="text-muted-foreground block">Total Experience</span>
                       <p className="font-medium">{credibilityResult.timelineAnalysis.totalYearsExperience} years</p>
                     </div>
                     {credibilityResult.timelineAnalysis.careerStartYear && (
                       <div>
-                        <span className="text-muted-foreground">Career Started</span>
+                        <span className="text-muted-foreground block">Career Started</span>
                         <p className="font-medium">{credibilityResult.timelineAnalysis.careerStartYear}</p>
                       </div>
                     )}
                     <div>
-                      <span className="text-muted-foreground">Avg. Tenure</span>
+                      <span className="text-muted-foreground block">Avg. Tenure</span>
                       <p className="font-medium">{Math.round(credibilityResult.timelineAnalysis.averageTenure)} months</p>
                     </div>
                   </div>
@@ -394,12 +394,12 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
 
           <TabsContent value="impact" className="space-y-4">
             <div className="text-center space-y-4">
-              <div className="p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
-                <div className="flex items-start gap-3">
-                  <Sparkles className="h-5 w-5 text-purple-600 shrink-0 mt-0.5" />
-                  <div className="text-left">
-                    <h4 className="font-semibold text-purple-900 dark:text-purple-100">Impact Quantification Engine</h4>
-                    <p className="text-sm text-purple-800 dark:text-purple-200">
+              <div className="p-3 sm:p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 shrink-0 mt-0.5" />
+                  <div className="text-left min-w-0">
+                    <h4 className="font-semibold text-xs sm:text-sm text-purple-900 dark:text-purple-100">Impact Quantification Engine</h4>
+                    <p className="text-xs sm:text-sm text-purple-800 dark:text-purple-200 break-words">
                       Transform weak bullet points into powerful, quantified achievements with strong action verbs.
                     </p>
                   </div>
@@ -420,10 +420,10 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
             
             {impactResult && (
               <div className="space-y-6 mt-6" data-testid="impact-results">
-                <div className="flex justify-center gap-6">
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-6">
                   <ScoreCircle score={impactResult.overallImpactScore} label="Impact Score" size="lg" />
                   <div className="flex flex-col items-center justify-center">
-                    <span className="text-3xl font-bold text-purple-600">{impactResult.weakBulletsCount}</span>
+                    <span className="text-2xl sm:text-3xl font-bold text-purple-600">{impactResult.weakBulletsCount}</span>
                     <span className="text-xs text-muted-foreground">Bullets Improved</span>
                   </div>
                 </div>
@@ -436,26 +436,26 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                     </h4>
                     <div className="space-y-4">
                       {impactResult.improvedBullets.map((bullet, i) => (
-                        <div key={i} className="p-4 bg-muted rounded-lg space-y-3">
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
+                        <div key={i} className="p-3 sm:p-4 bg-muted rounded-lg space-y-2 sm:space-y-3">
+                          <div className="flex items-start gap-2 sm:gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-1">
                                 <Badge variant="outline" className="text-xs border-red-300 text-red-600">Before</Badge>
                                 <span className="text-xs text-muted-foreground">{Math.round(bullet.confidenceScore)}% confidence</span>
                               </div>
-                              <p className="text-sm text-red-700 dark:text-red-300 line-through">{bullet.original}</p>
+                              <p className="text-xs sm:text-sm text-red-700 dark:text-red-300 line-through break-words">{bullet.original}</p>
                             </div>
                           </div>
                           <div className="flex items-center justify-center">
                             <ArrowRight className="h-4 w-4 text-muted-foreground" />
                           </div>
-                          <div className="flex items-start gap-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-start gap-2 sm:gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-1">
                                 <Badge variant="outline" className="text-xs border-green-300 text-green-600">After</Badge>
                                 <Badge variant="secondary" className="text-xs">{bullet.improvementType.replace(/_/g, ' ')}</Badge>
                               </div>
-                              <p className="text-sm text-green-700 dark:text-green-300 font-medium">{bullet.improved}</p>
+                              <p className="text-xs sm:text-sm text-green-700 dark:text-green-300 font-medium break-words">{bullet.improved}</p>
                             </div>
                           </div>
                         </div>
@@ -538,13 +538,13 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-green-600 flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" />
+                    <h4 className="font-semibold text-sm sm:text-base text-green-600 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
                       Matching Skills ({skillsGapResult.matchingSkills.length})
                     </h4>
                     <div className="flex flex-wrap gap-1">
                       {skillsGapResult.matchingSkills.map((skill, i) => (
-                        <Badge key={i} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 max-w-full break-words text-center">
+                        <Badge key={i} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 text-xs break-words">
                           {skill}
                         </Badge>
                       ))}
@@ -552,13 +552,13 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                   </div>
                   
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-red-600 flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4" />
+                    <h4 className="font-semibold text-sm sm:text-base text-red-600 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
                       Missing Skills ({skillsGapResult.missingSkills.length})
                     </h4>
                     <div className="flex flex-wrap gap-1">
                       {skillsGapResult.missingSkills.map((skill, i) => (
-                        <Badge key={i} variant="outline" className="border-red-300 text-red-700 dark:border-red-700 dark:text-red-300 max-w-full break-words text-center whitespace-normal">
+                        <Badge key={i} variant="outline" className="border-red-300 text-red-700 dark:border-red-700 dark:text-red-300 text-xs break-words whitespace-normal">
                           {skill}
                         </Badge>
                       ))}
@@ -612,7 +612,7 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                   <ScoreCircle score={jobMatchResult.matchScore} label="Overall Match" size="lg" />
                 </div>
                 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   <div className="space-y-2">
                     <span className="text-xs text-muted-foreground block text-center">Skills</span>
                     <Progress value={jobMatchResult.skillsMatch} className="h-2" />
@@ -674,21 +674,21 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                   <ScoreCircle score={keywordResult.atsScore} label="ATS Score" size="lg" />
                 </div>
                 
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-green-600">Existing Keywords</h4>
+                    <h4 className="font-semibold text-sm sm:text-base text-green-600">Existing Keywords</h4>
                     <div className="flex flex-wrap gap-1">
                       {keywordResult.existingKeywords.map((keyword, i) => (
-                        <Badge key={i} variant="secondary">{keyword}</Badge>
+                        <Badge key={i} variant="secondary" className="text-xs break-words">{keyword}</Badge>
                       ))}
                     </div>
                   </div>
                   
                   <div className="space-y-2">
-                    <h4 className="font-semibold text-orange-600">Missing Keywords</h4>
+                    <h4 className="font-semibold text-sm sm:text-base text-orange-600">Missing Keywords</h4>
                     <div className="flex flex-wrap gap-1">
                       {keywordResult.missingKeywords.map((keyword, i) => (
-                        <Badge key={i} variant="outline" className="border-orange-300">{keyword}</Badge>
+                        <Badge key={i} variant="outline" className="border-orange-300 text-xs break-words">{keyword}</Badge>
                       ))}
                     </div>
                   </div>

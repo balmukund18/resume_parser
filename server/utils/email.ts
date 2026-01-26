@@ -240,36 +240,97 @@ export async function sendResumeEmail(
   }
 
   try {
-    const transporter = nodemailer.createTransport({
+    // Create transporter with proper timeout and TLS settings
+    const transporterOptions: any = {
       host: config.host,
       port: config.port,
-      secure: config.secure,
+      secure: config.secure, // true for 465, false for other ports
       auth: config.auth,
-    });
+      // Timeout settings (in milliseconds)
+      connectionTimeout: 10000, // 10 seconds to establish connection
+      socketTimeout: 10000, // 10 seconds for socket inactivity
+      greetingTimeout: 10000, // 10 seconds for SMTP greeting
+      // TLS/SSL settings
+      requireTLS: !config.secure && config.port === 587, // Require TLS for port 587
+      tls: {
+        rejectUnauthorized: false, // Allow self-signed certificates (for some SMTP servers)
+      },
+    };
+
+    const transporter = nodemailer.createTransport(transporterOptions);
+
+    // Verify connection before sending (optional but helpful for debugging)
+    try {
+      await transporter.verify();
+      logger.info(`SMTP connection verified for ${config.host}:${config.port}`);
+    } catch (verifyError) {
+      logger.warn(`SMTP verification failed (continuing anyway): ${verifyError}`);
+      // Continue anyway - some servers don't support verify
+    }
 
     const subject = `Resume Analysis Results - ${resume.name}`;
     const htmlContent = formatResumeAsHTML(resume, includeFullDetails);
     const textContent = formatResumeAsText(resume, includeFullDetails);
 
-    const info = await transporter.sendMail({
-      from: config.auth.user,
+    // Send email with timeout wrapper
+    const sendPromise = transporter.sendMail({
+      from: `"Resume Parser" <${config.auth.user}>`, // Better from format
       to: toEmail,
       subject,
       text: textContent,
       html: htmlContent,
     });
 
+    // Add overall timeout (15 seconds total)
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error("Email sending timeout: Request took longer than 15 seconds"));
+      }, 15000);
+    });
+
+    const info = await Promise.race([sendPromise, timeoutPromise]);
+
     logger.info(`Email sent successfully to ${toEmail}, messageId: ${info.messageId}`);
+
+    // Close the transporter connection
+    transporter.close();
 
     return {
       success: true,
       messageId: info.messageId,
     };
   } catch (error) {
-    logger.error(`Failed to send email: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorDetails = error instanceof Error ? {
+      name: error.name,
+      code: (error as any).code,
+      command: (error as any).command,
+      response: (error as any).response,
+      responseCode: (error as any).responseCode,
+    } : {};
+
+    logger.error(`Failed to send email to ${toEmail}:`, {
+      error: errorMessage,
+      details: errorDetails,
+      smtpHost: config.host,
+      smtpPort: config.port,
+    });
+
+    // Provide more helpful error messages
+    let userFriendlyError = errorMessage;
+    if (errorMessage.includes("timeout")) {
+      userFriendlyError = "Connection timeout: The email server did not respond in time. Please check your SMTP settings.";
+    } else if (errorMessage.includes("ECONNREFUSED") || errorMessage.includes("ENOTFOUND")) {
+      userFriendlyError = `Cannot connect to SMTP server ${config.host}:${config.port}. Please verify your SMTP_HOST and SMTP_PORT settings.`;
+    } else if (errorMessage.includes("EAUTH") || errorMessage.includes("authentication")) {
+      userFriendlyError = "SMTP authentication failed. Please verify your SMTP_USER and SMTP_PASS credentials.";
+    } else if (errorMessage.includes("ETIMEDOUT")) {
+      userFriendlyError = "Connection timed out. The SMTP server may be unreachable or blocking the connection.";
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown email error",
+      error: userFriendlyError,
     };
   }
 }

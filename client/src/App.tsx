@@ -32,7 +32,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <div className="min-h-screen bg-background">
-          <div className="fixed top-4 right-4 z-50 pointer-events-auto">
+          <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-50 pointer-events-auto">
             <ThemeToggle />
           </div>
           <Router />

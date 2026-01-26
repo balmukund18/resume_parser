@@ -92,9 +92,9 @@ export function UploadDropzone({ onFileSelect, isUploading, disabled }: UploadDr
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-4">
+    <div className="w-full max-w-2xl mx-auto space-y-4 px-4 sm:px-0">
       <Card
-        className={`relative p-8 border-2 border-dashed transition-all duration-200 ${
+        className={`relative p-6 sm:p-8 border-2 border-dashed transition-all duration-200 ${
           isDragging
             ? "border-primary bg-primary/5"
             : "border-border hover:border-primary/50"
@@ -113,20 +113,20 @@ export function UploadDropzone({ onFileSelect, isUploading, disabled }: UploadDr
           data-testid="input-file"
         />
         
-        <div className="flex flex-col items-center justify-center space-y-4 text-center">
-          <div className={`p-4 rounded-full transition-colors ${
+        <div className="flex flex-col items-center justify-center space-y-3 sm:space-y-4 text-center">
+          <div className={`p-3 sm:p-4 rounded-full transition-colors ${
             isDragging ? "bg-primary/10" : "bg-muted"
           }`}>
-            <Upload className={`h-8 w-8 transition-colors ${
+            <Upload className={`h-6 w-6 sm:h-8 sm:w-8 transition-colors ${
               isDragging ? "text-primary" : "text-muted-foreground"
             }`} />
           </div>
           
-          <div className="space-y-2">
-            <p className="text-lg font-medium">
+          <div className="space-y-1 sm:space-y-2">
+            <p className="text-base sm:text-lg font-medium">
               {isDragging ? "Drop your resume here" : "Drag and drop your resume"}
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               or click to browse files
             </p>
           </div>
@@ -153,19 +153,19 @@ export function UploadDropzone({ onFileSelect, isUploading, disabled }: UploadDr
       )}
 
       {selectedFile && !error && (
-        <Card className="p-4" data-testid="selected-file">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2 bg-primary/10 rounded-md shrink-0">
-                <FileText className="h-5 w-5 text-primary" />
+        <Card className="p-3 sm:p-4" data-testid="selected-file">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 w-full sm:w-auto">
+              <div className="p-1.5 sm:p-2 bg-primary/10 rounded-md shrink-0">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               </div>
-              <div className="min-w-0">
-                <p className="font-medium truncate" data-testid="text-filename">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-sm sm:text-base truncate" data-testid="text-filename">
                   {selectedFile.name}
                 </p>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
                   <span>{formatFileSize(selectedFile.size)}</span>
-                  <span className="text-border">|</span>
+                  <span className="text-border hidden sm:inline">|</span>
                   <Badge variant="outline" className="text-xs">
                     {getFileExtension(selectedFile.name)}
                   </Badge>
@@ -173,28 +173,35 @@ export function UploadDropzone({ onFileSelect, isUploading, disabled }: UploadDr
               </div>
             </div>
             
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end sm:justify-start">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={handleRemoveFile}
                 disabled={isUploading}
                 data-testid="button-remove-file"
+                className="h-8 w-8 sm:h-10 sm:w-10"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
               <Button
                 onClick={handleUpload}
                 disabled={isUploading}
                 data-testid="button-upload"
+                size="sm"
+                className="text-xs sm:text-sm"
               >
                 {isUploading ? (
                   <>
-                    <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                    Uploading...
+                    <div className="h-3 w-3 sm:h-4 sm:w-4 border-2 border-current border-t-transparent rounded-full animate-spin sm:mr-2" />
+                    <span className="hidden sm:inline">Uploading...</span>
+                    <span className="sm:hidden">Uploading</span>
                   </>
                 ) : (
-                  "Parse Resume"
+                  <>
+                    <span className="hidden sm:inline">Parse Resume</span>
+                    <span className="sm:hidden">Parse</span>
+                  </>
                 )}
               </Button>
             </div>

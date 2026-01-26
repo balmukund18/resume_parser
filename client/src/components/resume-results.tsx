@@ -63,19 +63,19 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
     <Collapsible open={openSections.has(id)} onOpenChange={() => toggleSection(id)}>
       <Card className={isEmpty ? "opacity-60" : ""}>
         <CollapsibleTrigger asChild>
-          <CardHeader className="flex flex-row items-center justify-between gap-4 cursor-pointer hover-elevate">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/10 rounded-md">
-                <Icon className="h-4 w-4 text-primary" />
+          <CardHeader className="flex flex-row items-center justify-between gap-2 sm:gap-4 cursor-pointer hover-elevate py-3 sm:py-4">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              <div className="p-1.5 sm:p-2 bg-primary/10 rounded-md shrink-0">
+                <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
               </div>
-              <CardTitle className="text-base">{title}</CardTitle>
+              <CardTitle className="text-sm sm:text-base truncate">{title}</CardTitle>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               {confidenceScore !== undefined && <ConfidenceBadge score={confidenceScore} />}
               {openSections.has(id) ? (
-                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
               )}
             </div>
           </CardHeader>
@@ -103,32 +103,33 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
   );
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-6" data-testid="resume-results">
+    <div className="w-full max-w-4xl mx-auto space-y-4 sm:space-y-6 px-4 sm:px-6" data-testid="resume-results">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back" className="shrink-0">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold" data-testid="text-resume-name">{resume.name || "Unknown"}</h1>
-            <p className="text-sm text-muted-foreground">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-resume-name">{resume.name || "Unknown"}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">
               Parsed from {resume.metadata.originalFilename}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           {resume.metadata.overallConfidence !== undefined && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Overall Confidence:</span>
+              <span className="text-xs sm:text-sm text-muted-foreground hidden sm:inline">Overall Confidence:</span>
+              <span className="text-xs sm:text-sm text-muted-foreground sm:hidden">Confidence:</span>
               <ConfidenceBadge score={resume.metadata.overallConfidence} />
             </div>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button data-testid="button-export">
-                <Download className="h-4 w-4 mr-2" />
-                Export
+              <Button size="sm" className="text-xs sm:text-sm" data-testid="button-export">
+                <Download className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Export</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -148,15 +149,15 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
       {/* Summary */}
       {resume.summary && (
         <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm leading-relaxed" data-testid="text-summary">{resume.summary}</p>
+          <CardContent className="pt-4 sm:pt-6">
+            <p className="text-xs sm:text-sm leading-relaxed break-words" data-testid="text-summary">{resume.summary}</p>
           </CardContent>
         </Card>
       )}
 
       {/* Personal Info */}
       <Section id="personal" title="Contact Information" icon={User} isEmpty={!hasContactInfo}>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
           {resume.contactInfo.email && (
             <div className="flex items-center gap-2" data-testid="contact-email">
               <Mail className="h-4 w-4 text-muted-foreground" />
@@ -176,15 +177,19 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
             </div>
           )}
           {resume.contactInfo.linkedin && (
-            <div className="flex items-center gap-2" data-testid="contact-linkedin">
-              <Linkedin className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm truncate">{resume.contactInfo.linkedin}</span>
+            <div className="flex items-center gap-2 min-w-0" data-testid="contact-linkedin">
+              <Linkedin className="h-4 w-4 text-muted-foreground shrink-0" />
+              <a href={resume.contactInfo.linkedin} target="_blank" rel="noopener noreferrer" className="text-xs sm:text-sm truncate text-primary hover:underline">
+                {resume.contactInfo.linkedin}
+              </a>
             </div>
           )}
           {resume.contactInfo.github && (
-            <div className="flex items-center gap-2" data-testid="contact-github">
-              <Github className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm truncate">{resume.contactInfo.github}</span>
+            <div className="flex items-center gap-2 min-w-0" data-testid="contact-github">
+              <Github className="h-4 w-4 text-muted-foreground shrink-0" />
+              <a href={resume.contactInfo.github} target="_blank" rel="noopener noreferrer" className="text-xs sm:text-sm truncate text-primary hover:underline">
+                {resume.contactInfo.github}
+              </a>
             </div>
           )}
         </div>
@@ -200,22 +205,22 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
         <div className="space-y-6">
           {resume.experience.map((exp, index) => (
             <div key={index} className="space-y-2" data-testid={`experience-${index}`}>
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                  <h4 className="font-semibold">{exp.position}</h4>
-                  <p className="text-sm text-muted-foreground">{exp.company}</p>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-semibold text-sm sm:text-base break-words">{exp.position}</h4>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">{exp.company}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {exp.startDate || "N/A"} - {exp.endDate || "Present"}
                   </span>
                   <ConfidenceBadge score={exp.confidenceScore} showLabel={false} />
                 </div>
               </div>
               {exp.responsibilities.length > 0 && (
-                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground pl-1">
+                <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-muted-foreground pl-1">
                   {exp.responsibilities.map((resp, i) => (
-                    <li key={i}>{resp}</li>
+                    <li key={i} className="break-words">{resp}</li>
                   ))}
                 </ul>
               )}
@@ -241,17 +246,17 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
       >
         <div className="space-y-4">
           {resume.education.map((edu, index) => (
-            <div key={index} className="flex items-start justify-between gap-4 flex-wrap" data-testid={`education-${index}`}>
-              <div>
-                <h4 className="font-semibold">{edu.degree}</h4>
-                <p className="text-sm text-muted-foreground">{edu.institution}</p>
+            <div key={index} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4" data-testid={`education-${index}`}>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-semibold text-sm sm:text-base break-words">{edu.degree}</h4>
+                <p className="text-xs sm:text-sm text-muted-foreground break-words">{edu.institution}</p>
                 {edu.gpa && (
                   <p className="text-xs text-muted-foreground">GPA: {edu.gpa}</p>
                 )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {edu.graduationDate && (
-                  <span className="text-xs text-muted-foreground">{edu.graduationDate}</span>
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">{edu.graduationDate}</span>
                 )}
                 <ConfidenceBadge score={edu.confidenceScore} showLabel={false} />
               </div>
@@ -302,12 +307,14 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
         <div className="space-y-4">
           {resume.projects.map((project, index) => (
             <div key={index} className="space-y-2" data-testid={`project-${index}`}>
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                  <h4 className="font-semibold">{project.name}</h4>
-                  <p className="text-sm text-muted-foreground">{project.description}</p>
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-semibold text-sm sm:text-base break-words">{project.name}</h4>
+                  <p className="text-xs sm:text-sm text-muted-foreground break-words">{project.description}</p>
                 </div>
-                <ConfidenceBadge score={project.confidenceScore} showLabel={false} />
+                <div className="shrink-0">
+                  <ConfidenceBadge score={project.confidenceScore} showLabel={false} />
+                </div>
               </div>
               {project.technologies.length > 0 && (
                 <div className="flex flex-wrap gap-1">
@@ -321,7 +328,7 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
                   href={project.url} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="text-xs text-primary hover:underline"
+                  className="text-xs text-primary hover:underline break-all"
                 >
                   {project.url}
                 </a>
@@ -341,10 +348,10 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
       >
         <div className="space-y-3">
           {resume.certifications.map((cert, index) => (
-            <div key={index} className="flex items-start justify-between gap-4 flex-wrap" data-testid={`certification-${index}`}>
-              <div>
-                <h4 className="font-semibold text-sm">{cert.name}</h4>
-                <p className="text-xs text-muted-foreground">{cert.issuer}</p>
+            <div key={index} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4" data-testid={`certification-${index}`}>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-semibold text-xs sm:text-sm break-words">{cert.name}</h4>
+                <p className="text-xs text-muted-foreground break-words">{cert.issuer}</p>
                 {cert.issueDate && (
                   <p className="text-xs text-muted-foreground">
                     Issued: {cert.issueDate}
@@ -352,7 +359,9 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
                   </p>
                 )}
               </div>
-              <ConfidenceBadge score={cert.confidenceScore} showLabel={false} />
+              <div className="shrink-0">
+                <ConfidenceBadge score={cert.confidenceScore} showLabel={false} />
+              </div>
             </div>
           ))}
         </div>
@@ -455,8 +464,8 @@ export function ResumeResults({ resume, onBack, onExport }: ResumeResultsProps) 
 
       {/* Metadata */}
       <Card className="bg-muted/50">
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-6 text-xs text-muted-foreground">
+        <CardContent className="pt-4 sm:pt-6">
+          <div className="flex flex-wrap gap-3 sm:gap-6 text-xs text-muted-foreground">
             <div>
               <span className="font-medium">File:</span> {resume.metadata.originalFilename}
             </div>

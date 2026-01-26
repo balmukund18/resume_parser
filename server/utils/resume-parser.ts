@@ -845,64 +845,214 @@ Be specific and actionable. Only return valid JSON.`;
  * Check resume credibility - flags overlapping dates, unrealistic timelines, etc.
  */
 export async function checkCredibility(resume: ParsedResume): Promise<CredibilityResult> {
-  const experienceDetails = resume.experience.map(e => ({
-    position: e.position,
-    company: e.company,
-    startDate: e.startDate,
-    endDate: e.endDate,
-    responsibilities: e.responsibilities.length,
-  }));
+  // Pre-calculate all date-related metrics
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  
+  // Parse dates and calculate experience
+  const parsedExperiences = resume.experience.map(exp => {
+    const parseDate = (dateStr: string | null | undefined): { year: number; month: number } | null => {
+      if (!dateStr || dateStr === "Present") return null;
+      // Handle formats: YYYY-MM-DD, YYYY-MM, YYYY
+      const parts = dateStr.split("-");
+      const year = parseInt(parts[0], 10);
+      const month = parts.length > 1 ? parseInt(parts[1], 10) : 1;
+      if (isNaN(year) || isNaN(month)) return null;
+      return { year, month };
+    };
+    
+    const start = parseDate(exp.startDate);
+    const end = exp.endDate === "Present" ? { year: currentYear, month: currentMonth } : parseDate(exp.endDate);
+    
+    return {
+      position: exp.position,
+      company: exp.company,
+      startDate: exp.startDate,
+      endDate: exp.endDate,
+      start,
+      end,
+    };
+  }).filter(exp => exp.start !== null); // Only include entries with valid start dates
+  
+  // Calculate total years of experience
+  if (parsedExperiences.length === 0) {
+    return {
+      credibilityScore: 85,
+      flags: [],
+      timelineAnalysis: {
+        totalYearsExperience: 0,
+        averageTenure: 0,
+        gaps: [],
+      },
+      overallAssessment: "Resume appears credible. No experience entries to analyze.",
+    };
+  }
+  
+  // Sort by start date
+  parsedExperiences.sort((a, b) => {
+    if (!a.start || !b.start) return 0;
+    if (a.start.year !== b.start.year) return a.start.year - b.start.year;
+    return a.start.month - b.start.month;
+  });
+  
+  // Calculate total months of experience
+  let totalMonths = 0;
+  const sortedRanges: Array<{ start: { year: number; month: number }; end: { year: number; month: number } }> = [];
+  
+  parsedExperiences.forEach(exp => {
+    if (exp.start && exp.end) {
+      const startMonths = exp.start.year * 12 + exp.start.month;
+      const endMonths = exp.end.year * 12 + exp.end.month;
+      totalMonths += (endMonths - startMonths);
+      sortedRanges.push({ start: exp.start, end: exp.end });
+    }
+  });
+  
+  const totalYearsExperience = Math.round((totalMonths / 12) * 10) / 10; // Round to 1 decimal
+  const averageTenureMonths = Math.round((totalMonths / parsedExperiences.length) * 10) / 10;
+  
+  // Detect overlapping roles
+  let overlapCount = 0;
+  for (let i = 0; i < sortedRanges.length; i++) {
+    for (let j = i + 1; j < sortedRanges.length; j++) {
+      const range1 = sortedRanges[i];
+      const range2 = sortedRanges[j];
+      const start1 = range1.start.year * 12 + range1.start.month;
+      const end1 = range1.end.year * 12 + range1.end.month;
+      const start2 = range2.start.year * 12 + range2.start.month;
+      const end2 = range2.end.year * 12 + range2.end.month;
+      
+      // Check if ranges overlap
+      if (!(end1 < start2 || end2 < start1)) {
+        overlapCount++;
+      }
+    }
+  }
+  
+  // Detect employment gaps
+  const gaps: Array<{ start: string; end: string; durationMonths: number }> = [];
+  for (let i = 0; i < sortedRanges.length - 1; i++) {
+    const currentEnd = sortedRanges[i].end;
+    const nextStart = sortedRanges[i + 1].start;
+    const gapEndMonths = currentEnd.year * 12 + currentEnd.month;
+    const gapStartMonths = nextStart.year * 12 + nextStart.month;
+    const gapMonths = gapStartMonths - gapEndMonths;
+    
+    // Consider gaps of 2+ months (allowing for 1 month transition)
+    if (gapMonths >= 2) {
+      gaps.push({
+        start: `${currentEnd.year}-${String(currentEnd.month).padStart(2, '0')}`,
+        end: `${nextStart.year}-${String(nextStart.month).padStart(2, '0')}`,
+        durationMonths: gapMonths,
+      });
+    }
+  }
+  
+  // Build experience timeline string
+  const experienceTimeline = parsedExperiences.map(exp => 
+    `${exp.position} at ${exp.company}: ${exp.startDate} to ${exp.endDate}`
+  ).join("\n");
+  
+  // Build skills list (no years claimed)
+  const skillsList = [...resume.skills.technical, ...resume.skills.soft].join(", ");
+  
+  // Build education summary
+  const educationSummary = resume.education.map(e => 
+    `${e.degree} from ${e.institution}${e.graduationDate ? ` (${e.graduationDate})` : ''}`
+  ).join("\n");
+  
+  const prompt = `You are a resume credibility reviewer.
 
-  const prompt = `You are a resume credibility analyst. Analyze this resume for potential red flags and inconsistencies.
+IMPORTANT CONTEXT:
+All date calculations, overlaps, gaps, and experience durations have ALREADY been computed by code.
+You MUST NOT calculate dates, durations, or timelines yourself.
+You MUST NOT invent years of experience or assume skill durations.
 
-RESUME DATA:
-Name: ${resume.name}
-Total Experience Entries: ${resume.experience.length}
-Experience Timeline:
-${JSON.stringify(experienceDetails, null, 2)}
+Your task is to INTERPRET the verified facts below and highlight potential review points carefully and conservatively.
 
-Skills: ${[...resume.skills.technical, ...resume.skills.soft].join(", ")}
+=====================
+VERIFIED FACTS
+=====================
+
+Total years of professional experience: ${totalYearsExperience}
+Average tenure per role (months): ${averageTenureMonths}
+
+Overlapping roles detected: ${overlapCount}
+Employment gaps detected: ${gaps.length}
+
+If overlaps exist, they have already been confirmed by code.
+If gaps exist, they have already been confirmed by code.
+
+Chronological experience:
+${experienceTimeline}
+
+Skills listed (no years claimed unless explicitly stated):
+${skillsList}
 
 Education:
-${resume.education.map(e => `${e.degree} from ${e.institution} (${e.graduationDate || 'N/A'})`).join("\n")}
+${educationSummary}
 
-ANALYSIS REQUIREMENTS:
-1. Check for overlapping job dates
-2. Check for unrealistic career progression (e.g., junior to CEO in 2 years)
-3. Check for skill-experience mismatch (e.g., "10 years React" but only 3 years total experience)
-4. Check for employment gaps (not necessarily bad, just note them)
-5. Check if claimed expertise matches experience level
-6. Look for too many senior roles too quickly
+=====================
+ANALYSIS GUIDELINES
+=====================
 
-Return a JSON response:
+1. DO NOT calculate or infer dates, years, or durations.
+2. DO NOT assume seniority based on job titles alone.
+3. DO NOT assume skill experience length unless explicitly stated.
+4. Employment gaps are NOT negative by default — only note them.
+5. Overlapping roles are only high severity if they are unexplained and significant.
+6. Rapid career growth can be normal — flag ONLY if extreme or implausible.
+7. Be objective, neutral, and non-accusatory.
+
+=====================
+SCORING RULES
+=====================
+
+Start credibilityScore at 100.
+
+Apply deductions carefully:
+- Minor gap or overlap: −5
+- Clear but explainable issue: −10
+- Multiple moderate concerns: −20
+- Severe or repeated inconsistencies: up to −40
+
+NEVER score below 60 unless there are multiple high-severity issues.
+
+If no meaningful concerns exist, keep score between 85–100.
+
+=====================
+OUTPUT FORMAT
+=====================
+
+Return ONLY valid JSON in this exact schema:
+
 {
-  "credibilityScore": 0-100 (100 = highly credible, lower = more red flags),
+  "credibilityScore": number,
   "flags": [
     {
       "type": "overlapping_dates" | "unrealistic_timeline" | "skill_mismatch" | "rapid_progression" | "gap_detected" | "other",
       "severity": "low" | "medium" | "high",
-      "message": "Brief description of the issue",
-      "details": "More context if needed"
+      "message": "Clear, neutral description of the review point",
+      "details": "Optional additional context, if helpful"
     }
   ],
   "timelineAnalysis": {
-    "totalYearsExperience": number,
-    "careerStartYear": number or null,
-    "averageTenure": number (average months per position),
-    "gaps": [
-      { "start": "YYYY-MM", "end": "YYYY-MM", "durationMonths": number }
-    ]
+    "totalYearsExperience": ${totalYearsExperience},
+    "averageTenure": ${averageTenureMonths},
+    "gaps": ${JSON.stringify(gaps)}
   },
-  "overallAssessment": "Summary of credibility analysis - be fair and objective"
+  "overallAssessment": "Balanced summary of resume credibility. Be fair and professional."
 }
 
-IMPORTANT:
-- Be objective, not accusatory. These are flags for review, not accusations.
-- A gap is not a red flag by itself, just note it.
-- Some rapid progression is normal in fast-growing industries.
-- If the resume looks credible, give a high score and minimal flags.
+=====================
+FINAL REMINDERS
+=====================
 
-Only return valid JSON.`;
+- Be conservative. Fewer accurate flags are better than many weak ones.
+- This is a review aid, NOT an accusation system.
+- If the resume appears credible, explicitly say so.
+- Return ONLY JSON. No explanations outside JSON.`;
 
   const response = await generateContentWithFallback({
     model: "gemini-2.5-flash",

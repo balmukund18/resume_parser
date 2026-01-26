@@ -71,22 +71,26 @@ export function ProcessingStatus({ job, onViewResults, onRetry }: ProcessingStat
   };
 
   return (
-    <Card className="w-full max-w-2xl mx-auto" data-testid={`card-processing-${job.id}`}>
-      <CardHeader className="flex flex-row items-center gap-4 space-y-0 pb-4">
-        <div className="p-3 bg-muted rounded-lg">
-          <FileText className="h-6 w-6 text-muted-foreground" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <CardTitle className="text-lg truncate" data-testid="text-job-filename">
-            {job.filename}
-          </CardTitle>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>{formatFileSize(job.fileSize)}</span>
-            <span className="text-border">|</span>
-            <span>{job.fileType.toUpperCase()}</span>
+    <Card className="w-full max-w-2xl mx-auto px-4 sm:px-0" data-testid={`card-processing-${job.id}`}>
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 space-y-0 pb-4">
+        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 w-full sm:w-auto">
+          <div className="p-2 sm:p-3 bg-muted rounded-lg shrink-0">
+            <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base sm:text-lg truncate" data-testid="text-job-filename">
+              {job.filename}
+            </CardTitle>
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
+              <span>{formatFileSize(job.fileSize)}</span>
+              <span className="text-border hidden sm:inline">|</span>
+              <span>{job.fileType.toUpperCase()}</span>
+            </div>
           </div>
         </div>
-        {getStatusBadge()}
+        <div className="shrink-0 self-start sm:self-center">
+          {getStatusBadge()}
+        </div>
       </CardHeader>
       
       <CardContent className="space-y-4">
