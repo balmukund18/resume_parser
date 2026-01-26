@@ -1,4 +1,4 @@
-import { Resend } from "resend";
+import * as brevo from "@getbrevo/brevo";
 import type { ParsedResume } from "@shared/schema";
 import { createModuleLogger } from "./logger";
 
@@ -201,54 +201,50 @@ export async function sendResumeEmail(
   resume: ParsedResume,
   includeFullDetails: boolean = true
 ): Promise<SendEmailResult> {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.BREVO_FROM_EMAIL || "noreply@brevo.com"; // Default Brevo sender
 
   if (!apiKey) {
-    logger.warn("Resend API key not configured. Set RESEND_API_KEY environment variable.");
+    logger.warn("Brevo API key not configured. Set BREVO_API_KEY environment variable.");
     return {
       success: false,
-      error: "Email service not configured. Please set RESEND_API_KEY environment variable.",
+      error: "Email service not configured. Please set BREVO_API_KEY environment variable.",
     };
   }
 
   try {
-    const resend = new Resend(apiKey);
+    const apiInstance = new brevo.TransactionalEmailsApi();
+    apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, apiKey);
 
     const subject = `Resume Analysis Results - ${resume.name}`;
     const htmlContent = formatResumeAsHTML(resume, includeFullDetails);
     const textContent = formatResumeAsText(resume, includeFullDetails);
 
-    const { data, error } = await resend.emails.send({
-      from: "Resume Parser <onboarding@resend.dev>",
-      to: toEmail,
-      subject,
-      html: htmlContent,
-      text: textContent,
-    });
+    const sendSmtpEmail = new brevo.SendSmtpEmail();
+    sendSmtpEmail.subject = subject;
+    sendSmtpEmail.htmlContent = htmlContent;
+    sendSmtpEmail.textContent = textContent;
+    sendSmtpEmail.sender = { name: "Resume Parser", email: fromEmail };
+    sendSmtpEmail.to = [{ email: toEmail }];
 
-    if (error) {
-      logger.error(`Resend API error:`, error);
-      return {
-        success: false,
-        error: error.message || "Failed to send email via Resend API",
-      };
-    }
+    const data = await apiInstance.sendTransacEmail(sendSmtpEmail);
 
-    logger.info(`Email sent successfully via Resend to ${toEmail}, messageId: ${data?.id}`);
+    const messageId = (data as any).messageId || (data as any).body?.messageId || "unknown";
+    logger.info(`Email sent successfully via Brevo to ${toEmail}, messageId: ${messageId}`);
     return {
       success: true,
-      messageId: data?.id,
+      messageId: messageId,
     };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.error(`Resend email sending failed:`, { error: errorMessage });
+  } catch (error: any) {
+    const errorMessage = error?.response?.body?.message || error?.message || String(error);
+    logger.error(`Brevo email sending failed:`, { error: errorMessage });
     return {
       success: false,
-      error: `Resend API error: ${errorMessage}`,
+      error: `Brevo API error: ${errorMessage}`,
     };
   }
 }
 
 export function isEmailConfigured(): boolean {
-  return !!process.env.RESEND_API_KEY;
+  return !!process.env.BREVO_API_KEY;
 }

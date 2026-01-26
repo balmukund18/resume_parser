@@ -196,7 +196,7 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="score" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-8 mb-4 sm:mb-6 h-auto overflow-x-auto">
+          <TabsList className="grid w-full grid-cols-4 sm:grid-cols-7 mb-4 sm:mb-6 h-auto overflow-x-auto">
             <TabsTrigger value="score" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-score">
               <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
               <span className="hidden sm:inline">Score</span>
@@ -211,11 +211,7 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
             </TabsTrigger>
             <TabsTrigger value="skills" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-skills">
               <Target className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
-              <span className="hidden sm:inline">Skills</span>
-            </TabsTrigger>
-            <TabsTrigger value="match" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-match">
-              <Search className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
-              <span className="hidden sm:inline">Match</span>
+              <span className="hidden sm:inline">Job Match</span>
             </TabsTrigger>
             <TabsTrigger value="keywords" className="text-[10px] sm:text-xs px-1.5 sm:px-2 py-1.5 sm:py-2 min-w-0" data-testid="tab-keywords">
               <Zap className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-1" />
@@ -517,130 +513,130 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                   data-testid="input-job-description"
                 />
               </div>
-              <Button 
-                onClick={() => skillsGapMutation.mutate()}
-                disabled={skillsGapMutation.isPending || !hasJobInfo}
-                data-testid="button-analyze-skills"
-              >
-                {skillsGapMutation.isPending ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analyzing...</>
-                ) : (
-                  <><Target className="h-4 w-4 mr-2" /> Analyze Skills Gap</>
-                )}
-              </Button>
-            </div>
-            
-            {skillsGapResult && (
-              <div className="space-y-4 mt-6" data-testid="skills-gap-results">
-                <div className="flex justify-center">
-                  <ScoreCircle score={skillsGapResult.matchScore} label="Match Score" size="lg" />
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-sm sm:text-base text-green-600 flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 shrink-0" />
-                      Matching Skills ({skillsGapResult.matchingSkills.length})
-                    </h4>
-                    <div className="flex flex-wrap gap-1">
-                      {skillsGapResult.matchingSkills.map((skill, i) => (
-                        <Badge key={i} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 text-xs break-words">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-sm sm:text-base text-red-600 flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      Missing Skills ({skillsGapResult.missingSkills.length})
-                    </h4>
-                    <div className="flex flex-wrap gap-1">
-                      {skillsGapResult.missingSkills.map((skill, i) => (
-                        <Badge key={i} variant="outline" className="border-red-300 text-red-700 dark:border-red-700 dark:text-red-300 text-xs break-words whitespace-normal">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                
-                {skillsGapResult.recommendations.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-semibold">Recommendations</h4>
-                    <ul className="space-y-1">
-                      {skillsGapResult.recommendations.map((rec, i) => (
-                        <li key={i} className="text-sm flex items-start gap-2">
-                          <Zap className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                          {rec}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button 
+                  onClick={() => skillsGapMutation.mutate()}
+                  disabled={skillsGapMutation.isPending || !hasJobInfo}
+                  data-testid="button-analyze-skills"
+                  className="flex-1"
+                >
+                  {skillsGapMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analyzing...</>
+                  ) : (
+                    <><Target className="h-4 w-4 mr-2" /> Analyze Skills Gap</>
+                  )}
+                </Button>
+                <Button 
+                  onClick={() => jobMatchMutation.mutate()}
+                  disabled={jobMatchMutation.isPending || !hasJobInfo}
+                  data-testid="button-match-job"
+                  variant="outline"
+                  className="flex-1"
+                >
+                  {jobMatchMutation.isPending ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Matching...</>
+                  ) : (
+                    <><Search className="h-4 w-4 mr-2" /> Match to Job</>
+                  )}
+                </Button>
               </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="match" className="space-y-4">
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                See how well your resume matches a specific job posting. Uses the job details entered in the Skills Gap tab.
-              </p>
-              <Button 
-                onClick={() => jobMatchMutation.mutate()}
-                disabled={jobMatchMutation.isPending || !hasJobInfo}
-                data-testid="button-match-job"
-              >
-                {jobMatchMutation.isPending ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Matching...</>
-                ) : (
-                  <><Search className="h-4 w-4 mr-2" /> Match to Job</>
-                )}
-              </Button>
-              {!hasJobInfo && (
-                <p className="text-xs text-muted-foreground">
-                  Enter job details in the Skills Gap tab first
-                </p>
-              )}
             </div>
             
-            {jobMatchResult && (
-              <div className="space-y-4 mt-6" data-testid="job-match-results">
-                <div className="flex justify-center">
-                  <ScoreCircle score={jobMatchResult.matchScore} label="Overall Match" size="lg" />
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                  <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground block text-center">Skills</span>
-                    <Progress value={jobMatchResult.skillsMatch} className="h-2" />
-                    <span className="text-xs font-medium block text-center">{Math.round(jobMatchResult.skillsMatch)}%</span>
+            {(skillsGapResult || jobMatchResult) && (
+              <div className="space-y-6 mt-6">
+                {/* Comprehensive Job Match Results */}
+                {jobMatchResult && (
+                  <div className="space-y-4" data-testid="job-match-results">
+                    <div className="flex justify-center">
+                      <ScoreCircle score={jobMatchResult.matchScore} label="Overall Match" size="lg" />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="space-y-2">
+                        <span className="text-xs text-muted-foreground block text-center">Skills</span>
+                        <Progress value={jobMatchResult.skillsMatch} className="h-2" />
+                        <span className="text-xs font-medium block text-center">{Math.round(jobMatchResult.skillsMatch)}%</span>
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-xs text-muted-foreground block text-center">Experience</span>
+                        <Progress value={jobMatchResult.experienceMatch} className="h-2" />
+                        <span className="text-xs font-medium block text-center">{Math.round(jobMatchResult.experienceMatch)}%</span>
+                      </div>
+                      <div className="space-y-2">
+                        <span className="text-xs text-muted-foreground block text-center">Education</span>
+                        <Progress value={jobMatchResult.educationMatch} className="h-2" />
+                        <span className="text-xs font-medium block text-center">{Math.round(jobMatchResult.educationMatch)}%</span>
+                      </div>
+                    </div>
+                    
+                    {jobMatchResult.reasons.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm sm:text-base">Match Analysis</h4>
+                        <ul className="space-y-1">
+                          {jobMatchResult.reasons.map((reason, i) => (
+                            <li key={i} className="text-sm flex items-start gap-2">
+                              <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+                              {reason}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground block text-center">Experience</span>
-                    <Progress value={jobMatchResult.experienceMatch} className="h-2" />
-                    <span className="text-xs font-medium block text-center">{Math.round(jobMatchResult.experienceMatch)}%</span>
-                  </div>
-                  <div className="space-y-2">
-                    <span className="text-xs text-muted-foreground block text-center">Education</span>
-                    <Progress value={jobMatchResult.educationMatch} className="h-2" />
-                    <span className="text-xs font-medium block text-center">{Math.round(jobMatchResult.educationMatch)}%</span>
-                  </div>
-                </div>
-                
-                {jobMatchResult.reasons.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="font-semibold">Analysis</h4>
-                    <ul className="space-y-1">
-                      {jobMatchResult.reasons.map((reason, i) => (
-                        <li key={i} className="text-sm flex items-start gap-2">
-                          <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-                          {reason}
-                        </li>
-                      ))}
-                    </ul>
+                )}
+
+                {/* Skills Gap Details */}
+                {skillsGapResult && (
+                  <div className="space-y-4" data-testid="skills-gap-results">
+                    {!jobMatchResult && (
+                      <div className="flex justify-center">
+                        <ScoreCircle score={skillsGapResult.matchScore} label="Skills Match Score" size="lg" />
+                      </div>
+                    )}
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm sm:text-base text-green-600 flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 shrink-0" />
+                          Matching Skills ({skillsGapResult.matchingSkills.length})
+                        </h4>
+                        <div className="flex flex-wrap gap-1">
+                          {skillsGapResult.matchingSkills.map((skill, i) => (
+                            <Badge key={i} variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 text-xs break-words">
+                              {skill}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm sm:text-base text-red-600 flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 shrink-0" />
+                          Missing Skills ({skillsGapResult.missingSkills.length})
+                        </h4>
+                        <div className="flex flex-wrap gap-1">
+                          {skillsGapResult.missingSkills.map((skill, i) => (
+                            <Badge key={i} variant="outline" className="border-red-300 text-red-700 dark:border-red-700 dark:text-red-300 text-xs break-words whitespace-normal">
+                              {skill}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {skillsGapResult.recommendations.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="font-semibold text-sm sm:text-base">Recommendations</h4>
+                        <ul className="space-y-1">
+                          {skillsGapResult.recommendations.map((rec, i) => (
+                            <li key={i} className="text-sm flex items-start gap-2">
+                              <Zap className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                              {rec}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -664,7 +660,7 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
                 )}
               </Button>
               <p className="text-xs text-muted-foreground">
-                {hasJobInfo ? "Will optimize for the job description entered in Skills Gap tab." : "General ATS optimization - add job details in Skills Gap tab for targeted optimization."}
+                {hasJobInfo ? "Will optimize for the job description entered in Job Match tab." : "General ATS optimization - add job details in Job Match tab for targeted optimization."}
               </p>
             </div>
             
