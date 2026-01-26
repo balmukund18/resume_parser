@@ -904,7 +904,8 @@ export async function checkCredibility(resume: ParsedResume): Promise<Credibilit
     if (exp.start && exp.end) {
       const startMonths = exp.start.year * 12 + exp.start.month;
       const endMonths = exp.end.year * 12 + exp.end.month;
-      totalMonths += (endMonths - startMonths);
+      // Add 1 to include both start and end months (e.g., Jun-Jul = 2 months, not 1)
+      totalMonths += (endMonths - startMonths + 1);
       sortedRanges.push({ start: exp.start, end: exp.end });
     }
   });

@@ -1,41 +1,13 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import type { ParsedResume } from "@shared/schema";
 import { createModuleLogger } from "./logger";
 
 const logger = createModuleLogger("Email");
 
-interface EmailConfig {
-  host: string;
-  port: number;
-  secure: boolean;
-  auth: {
-    user: string;
-    pass: string;
-  };
-}
-
 interface SendEmailResult {
   success: boolean;
   messageId?: string;
   error?: string;
-}
-
-function getEmailConfig(): EmailConfig | null {
-  const host = process.env.SMTP_HOST;
-  const port = process.env.SMTP_PORT;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
-  if (!host || !user || !pass) {
-    return null;
-  }
-
-  return {
-    host,
-    port: parseInt(port || "587", 10),
-    secure: port === "465",
-    auth: { user, pass },
-  };
 }
 
 function formatResumeAsHTML(resume: ParsedResume, includeFullDetails: boolean): string {
@@ -229,113 +201,54 @@ export async function sendResumeEmail(
   resume: ParsedResume,
   includeFullDetails: boolean = true
 ): Promise<SendEmailResult> {
-  const config = getEmailConfig();
+  const apiKey = process.env.RESEND_API_KEY;
 
-  if (!config) {
-    logger.warn("SMTP not configured. Set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables.");
+  if (!apiKey) {
+    logger.warn("Resend API key not configured. Set RESEND_API_KEY environment variable.");
     return {
       success: false,
-      error: "Email service not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS.",
+      error: "Email service not configured. Please set RESEND_API_KEY environment variable.",
     };
   }
 
   try {
-    // Create transporter with proper timeout and TLS settings
-    // Increased timeouts for Railway/Gmail network conditions
-    const transporterOptions: any = {
-      host: config.host,
-      port: config.port,
-      secure: config.secure, // true for 465, false for other ports
-      auth: config.auth,
-      // Timeout settings (in milliseconds) - increased for Railway
-      connectionTimeout: 20000, // 20 seconds to establish connection (Railway may be slower)
-      socketTimeout: 20000, // 20 seconds for socket inactivity
-      greetingTimeout: 15000, // 15 seconds for SMTP greeting
-      // TLS/SSL settings
-      requireTLS: !config.secure && config.port === 587, // Require TLS for port 587
-      tls: {
-        rejectUnauthorized: false, // Allow self-signed certificates (for some SMTP servers)
-        ciphers: 'SSLv3', // Try different cipher suites if needed
-      },
-      // Additional options for better connection handling
-      pool: false, // Disable connection pooling to avoid stale connections
-      maxConnections: 1,
-      maxMessages: 1,
-    };
-
-    const transporter = nodemailer.createTransport(transporterOptions);
-
-    // Skip verification on Railway to avoid timeout - go straight to sending
-    // Verification can fail on Railway due to network restrictions, but sending may still work
-    logger.info(`Attempting to send email via ${config.host}:${config.port} (verification skipped for Railway compatibility)`);
+    const resend = new Resend(apiKey);
 
     const subject = `Resume Analysis Results - ${resume.name}`;
     const htmlContent = formatResumeAsHTML(resume, includeFullDetails);
     const textContent = formatResumeAsText(resume, includeFullDetails);
 
-    // Send email with timeout wrapper
-    const sendPromise = transporter.sendMail({
-      from: `"Resume Parser" <${config.auth.user}>`, // Better from format
+    const { data, error } = await resend.emails.send({
+      from: "Resume Parser <onboarding@resend.dev>",
       to: toEmail,
       subject,
-      text: textContent,
       html: htmlContent,
+      text: textContent,
     });
 
-    // Add overall timeout (30 seconds total for Railway network conditions)
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error("Email sending timeout: Request took longer than 30 seconds"));
-      }, 30000);
-    });
+    if (error) {
+      logger.error(`Resend API error:`, error);
+      return {
+        success: false,
+        error: error.message || "Failed to send email via Resend API",
+      };
+    }
 
-    const info = await Promise.race([sendPromise, timeoutPromise]);
-
-    logger.info(`Email sent successfully to ${toEmail}, messageId: ${info.messageId}`);
-
-    // Close the transporter connection
-    transporter.close();
-
+    logger.info(`Email sent successfully via Resend to ${toEmail}, messageId: ${data?.id}`);
     return {
       success: true,
-      messageId: info.messageId,
+      messageId: data?.id,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorDetails = error instanceof Error ? {
-      name: error.name,
-      code: (error as any).code,
-      command: (error as any).command,
-      response: (error as any).response,
-      responseCode: (error as any).responseCode,
-    } : {};
-
-    logger.error(`Failed to send email to ${toEmail}:`, {
-      error: errorMessage,
-      details: errorDetails,
-      smtpHost: config.host,
-      smtpPort: config.port,
-    });
-
-    // Provide more helpful error messages
-    let userFriendlyError = errorMessage;
-    if (errorMessage.includes("timeout")) {
-      userFriendlyError = "Connection timeout: The email server did not respond in time. Please check your SMTP settings.";
-    } else if (errorMessage.includes("ECONNREFUSED") || errorMessage.includes("ENOTFOUND")) {
-      userFriendlyError = `Cannot connect to SMTP server ${config.host}:${config.port}. Please verify your SMTP_HOST and SMTP_PORT settings.`;
-    } else if (errorMessage.includes("EAUTH") || errorMessage.includes("authentication")) {
-      userFriendlyError = "SMTP authentication failed. Please verify your SMTP_USER and SMTP_PASS credentials.";
-    } else if (errorMessage.includes("ETIMEDOUT")) {
-      userFriendlyError = "Connection timed out. The SMTP server may be unreachable or blocking the connection.";
-    }
-
+    logger.error(`Resend email sending failed:`, { error: errorMessage });
     return {
       success: false,
-      error: userFriendlyError,
+      error: `Resend API error: ${errorMessage}`,
     };
   }
 }
 
 export function isEmailConfigured(): boolean {
-  return getEmailConfig() !== null;
+  return !!process.env.RESEND_API_KEY;
 }
