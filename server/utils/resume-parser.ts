@@ -962,7 +962,35 @@ export async function checkCredibility(resume: ParsedResume): Promise<Credibilit
     `${e.degree} from ${e.institution}${e.graduationDate ? ` (${e.graduationDate})` : ''}`
   ).join("\n");
   
+  // Determine if this is a student/early-career resume
+  const isStudentOrEarlyCareer = totalYearsExperience < 2 || 
+    resume.education.some(e => {
+      const gradYear = e.graduationDate ? parseInt(e.graduationDate.split("-")[0]) : null;
+      return gradYear && gradYear >= currentYear - 2; // Graduated in last 2 years
+    });
+
+  // Classify each role as past, current, or future
+  const roleClassifications = parsedExperiences.map(exp => {
+    if (!exp.start) return { ...exp, classification: "unknown" };
+    const startMonths = exp.start.year * 12 + exp.start.month;
+    const currentMonths = currentYear * 12 + currentMonth;
+    const isCurrent = exp.endDate === "Present" && startMonths <= currentMonths;
+    const isFuture = startMonths > currentMonths;
+    const isPast = !isCurrent && !isFuture;
+    
+    return {
+      position: exp.position,
+      company: exp.company,
+      startDate: exp.startDate,
+      endDate: exp.endDate,
+      classification: isCurrent ? "current" : isFuture ? "future" : "past",
+    };
+  });
+
   const prompt = `You are a resume credibility reviewer.
+
+CRITICAL: TODAY'S DATE IS ${currentYear}-${String(currentMonth).padStart(2, '0')}
+You MUST use this exact date. Do NOT infer, guess, or assume the current date.
 
 IMPORTANT CONTEXT:
 All date calculations, overlaps, gaps, and experience durations have ALREADY been computed by code.
@@ -975,14 +1003,20 @@ Your task is to INTERPRET the verified facts below and highlight potential revie
 VERIFIED FACTS
 =====================
 
+TODAY'S DATE: ${currentYear}-${String(currentMonth).padStart(2, '0')}
+(Use this to determine if roles are past, current, or future)
+
 Total years of professional experience: ${totalYearsExperience}
 Average tenure per role (months): ${averageTenureMonths}
 
 Overlapping roles detected: ${overlapCount}
 Employment gaps detected: ${gaps.length}
 
-If overlaps exist, they have already been confirmed by code.
-If gaps exist, they have already been confirmed by code.
+Resume Type: ${isStudentOrEarlyCareer ? "STUDENT/EARLY-CAREER" : "PROFESSIONAL"}
+(Student/early-career resumes should be evaluated more leniently)
+
+Role Classifications (pre-computed):
+${roleClassifications.map(r => `- ${r.position} at ${r.company}: ${r.classification} (${r.startDate} to ${r.endDate})`).join("\n")}
 
 Chronological experience:
 ${experienceTimeline}
@@ -997,29 +1031,44 @@ ${educationSummary}
 ANALYSIS GUIDELINES
 =====================
 
-1. DO NOT calculate or infer dates, years, or durations.
+1. DO NOT calculate or infer dates, years, or durations. Use TODAY'S DATE provided above.
 2. DO NOT assume seniority based on job titles alone.
 3. DO NOT assume skill experience length unless explicitly stated.
 4. Employment gaps are NOT negative by default — only note them.
+   - Academic gaps (between education periods) are NORMAL and should NOT be flagged.
+   - Planned internships or future roles are NORMAL for students and should NOT be flagged.
 5. Overlapping roles are only high severity if they are unexplained and significant.
 6. Rapid career growth can be normal — flag ONLY if extreme or implausible.
 7. Be objective, neutral, and non-accusatory.
+8. FUTURE-DATED ROLES: A role is only "future-dated" if its start date is AFTER today's date (${currentYear}-${String(currentMonth).padStart(2, '0')}).
+   - Roles starting ON or BEFORE today are NOT future-dated.
+   - Roles starting in the current month and marked "Present" are CURRENT roles, not future.
+9. STUDENT/EARLY-CAREER RULES:
+   - Do NOT penalize for academic gaps or planned internships.
+   - Use softer scoring thresholds (start higher, deduct less).
+   - Career changes and exploration are normal at this stage.
 
 =====================
 SCORING RULES
 =====================
 
-Start credibilityScore at 100.
-
-Apply deductions carefully:
-- Minor gap or overlap: −5
-- Clear but explainable issue: −10
-- Multiple moderate concerns: −20
-- Severe or repeated inconsistencies: up to −40
-
-NEVER score below 60 unless there are multiple high-severity issues.
-
-If no meaningful concerns exist, keep score between 85–100.
+${isStudentOrEarlyCareer ? 
+  `STUDENT/EARLY-CAREER SCORING (More Lenient):
+- Start credibilityScore at 95 (higher baseline for students).
+- Minor gap or overlap: −3 (smaller deduction).
+- Clear but explainable issue: −5 (smaller deduction).
+- Multiple moderate concerns: −10 (smaller deduction).
+- Severe or repeated inconsistencies: up to −25 (smaller max deduction).
+- NEVER score below 70 unless there are multiple high-severity issues.
+- If no meaningful concerns exist, keep score between 85–100.` :
+  `PROFESSIONAL SCORING:
+- Start credibilityScore at 100.
+- Minor gap or overlap: −5.
+- Clear but explainable issue: −10.
+- Multiple moderate concerns: −20.
+- Severe or repeated inconsistencies: up to −40.
+- NEVER score below 60 unless there are multiple high-severity issues.
+- If no meaningful concerns exist, keep score between 85–100.`}
 
 =====================
 OUTPUT FORMAT

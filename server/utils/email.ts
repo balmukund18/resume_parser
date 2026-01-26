@@ -241,32 +241,33 @@ export async function sendResumeEmail(
 
   try {
     // Create transporter with proper timeout and TLS settings
+    // Increased timeouts for Railway/Gmail network conditions
     const transporterOptions: any = {
       host: config.host,
       port: config.port,
       secure: config.secure, // true for 465, false for other ports
       auth: config.auth,
-      // Timeout settings (in milliseconds)
-      connectionTimeout: 10000, // 10 seconds to establish connection
-      socketTimeout: 10000, // 10 seconds for socket inactivity
-      greetingTimeout: 10000, // 10 seconds for SMTP greeting
+      // Timeout settings (in milliseconds) - increased for Railway
+      connectionTimeout: 20000, // 20 seconds to establish connection (Railway may be slower)
+      socketTimeout: 20000, // 20 seconds for socket inactivity
+      greetingTimeout: 15000, // 15 seconds for SMTP greeting
       // TLS/SSL settings
       requireTLS: !config.secure && config.port === 587, // Require TLS for port 587
       tls: {
         rejectUnauthorized: false, // Allow self-signed certificates (for some SMTP servers)
+        ciphers: 'SSLv3', // Try different cipher suites if needed
       },
+      // Additional options for better connection handling
+      pool: false, // Disable connection pooling to avoid stale connections
+      maxConnections: 1,
+      maxMessages: 1,
     };
 
     const transporter = nodemailer.createTransport(transporterOptions);
 
-    // Verify connection before sending (optional but helpful for debugging)
-    try {
-      await transporter.verify();
-      logger.info(`SMTP connection verified for ${config.host}:${config.port}`);
-    } catch (verifyError) {
-      logger.warn(`SMTP verification failed (continuing anyway): ${verifyError}`);
-      // Continue anyway - some servers don't support verify
-    }
+    // Skip verification on Railway to avoid timeout - go straight to sending
+    // Verification can fail on Railway due to network restrictions, but sending may still work
+    logger.info(`Attempting to send email via ${config.host}:${config.port} (verification skipped for Railway compatibility)`);
 
     const subject = `Resume Analysis Results - ${resume.name}`;
     const htmlContent = formatResumeAsHTML(resume, includeFullDetails);
@@ -281,11 +282,11 @@ export async function sendResumeEmail(
       html: htmlContent,
     });
 
-    // Add overall timeout (15 seconds total)
+    // Add overall timeout (30 seconds total for Railway network conditions)
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => {
-        reject(new Error("Email sending timeout: Request took longer than 15 seconds"));
-      }, 15000);
+        reject(new Error("Email sending timeout: Request took longer than 30 seconds"));
+      }, 30000);
     });
 
     const info = await Promise.race([sendPromise, timeoutPromise]);
