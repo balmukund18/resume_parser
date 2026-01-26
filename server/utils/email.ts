@@ -213,8 +213,15 @@ export async function sendResumeEmail(
   }
 
   try {
+    // Initialize Brevo API instance
     const apiInstance = new brevo.TransactionalEmailsApi();
-    apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, apiKey);
+    
+    // Clean the API key to remove any whitespace or newlines (common copy-paste issues)
+    // Brevo API keys format: xkeysib-xxxxxxxxxxxxxxxxxxxxx
+    const cleanApiKey = apiKey.trim().replace(/[\r\n\t]/g, '');
+    
+    // Set API key using the correct method
+    apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, cleanApiKey);
 
     const subject = `Resume Analysis Results - ${resume.name}`;
     const htmlContent = formatResumeAsHTML(resume, includeFullDetails);
