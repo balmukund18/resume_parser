@@ -510,6 +510,7 @@ ${jobDescription.requiredSkills ? `**Required Skills:** ${jobDescription.require
    - How to gain these skills (courses, projects, certifications)
    - How to highlight transferable skills
    - How to frame existing experience to match requirements
+   - IMPORTANT: Write recommendations as plain text. Do NOT use markdown formatting (no **, *, _, etc.)
 
 ## OUTPUT FORMAT
 Return ONLY valid JSON (no markdown, no explanations):
@@ -519,11 +520,13 @@ Return ONLY valid JSON (no markdown, no explanations):
   "matchingSkills": ["array of skills candidate has that match job requirements"],
   "missingSkills": ["array of skills job requires that candidate lacks (prioritized by importance)"],
   "recommendations": [
-    "Specific, actionable recommendation 1",
-    "Specific, actionable recommendation 2",
+    "Specific, actionable recommendation 1 - plain text only",
+    "Specific, actionable recommendation 2 - plain text only",
     "..."
   ]
 }
+
+CRITICAL: All text fields must be plain text without markdown formatting. Do NOT use **bold**, *italic*, or any markdown syntax.
 
 Be thorough, specific, and constructive. Only return valid JSON.`;
 
@@ -624,6 +627,7 @@ Provide specific, actionable suggestions:
 - Industry best practices to follow
 - Common mistakes to avoid
 - Prioritized recommendations
+- IMPORTANT: Write suggestions as plain text. Do NOT use markdown formatting (no **, *, _, etc.)
 
 ## OUTPUT FORMAT
 Return ONLY valid JSON:
@@ -637,11 +641,13 @@ Return ONLY valid JSON:
   "educationScore": 0-100,
   "skillsScore": 0-100,
   "suggestions": [
-    "Specific, prioritized improvement suggestion 1",
-    "Specific, prioritized improvement suggestion 2",
+    "Specific, prioritized improvement suggestion 1 - plain text only",
+    "Specific, prioritized improvement suggestion 2 - plain text only",
     "..."
   ]
 }
+
+CRITICAL: All text fields must be plain text without markdown formatting. Do NOT use **bold**, *italic*, or any markdown syntax.
 
 Be critical but constructive. Only return valid JSON.`;
 
@@ -716,6 +722,7 @@ Evaluate the candidate across multiple dimensions:
    - Specific gaps or concerns
    - Transferable skills or experiences
    - Potential for growth/learning curve
+   - IMPORTANT: Write reasons as plain text. Do NOT use markdown formatting (no **, *, _, etc.)
 
 ## OUTPUT FORMAT
 Return ONLY valid JSON:
@@ -726,11 +733,13 @@ Return ONLY valid JSON:
   "experienceMatch": 0-100,
   "educationMatch": 0-100,
   "reasons": [
-    "Specific reason 1 (strength or gap)",
-    "Specific reason 2",
+    "Specific reason 1 (strength or gap) - write as plain text without markdown",
+    "Specific reason 2 - plain text only",
     "..."
   ]
 }
+
+CRITICAL: All text fields (reasons, recommendations, suggestions, messages) must be plain text without markdown formatting. Do NOT use **bold**, *italic*, or any markdown syntax.
 
 Be thorough, specific, and objective. Only return valid JSON.`;
 
@@ -823,12 +832,14 @@ Return ONLY valid JSON:
   "existingKeywords": ["keyword1", "keyword2", "..."],
   "missingKeywords": ["missing_keyword1", "missing_keyword2", "..."],
   "suggestedPhrases": [
-    "Specific phrase suggestion 1",
-    "Specific phrase suggestion 2",
+    "Specific phrase suggestion 1 - plain text only, no markdown",
+    "Specific phrase suggestion 2 - plain text only, no markdown",
     "..."
   ],
   "atsScore": 0-100
 }
+
+CRITICAL: All text fields (suggestedPhrases) must be plain text without markdown formatting. Do NOT use **bold**, *italic*, or any markdown syntax.
 
 Be specific and actionable. Only return valid JSON.`;
 
@@ -1079,14 +1090,14 @@ Return ONLY valid JSON in this exact schema:
 
 {
   "credibilityScore": number,
-  "flags": [
-    {
-      "type": "overlapping_dates" | "unrealistic_timeline" | "skill_mismatch" | "rapid_progression" | "gap_detected" | "other",
-      "severity": "low" | "medium" | "high",
-      "message": "Clear, neutral description of the review point",
-      "details": "Optional additional context, if helpful"
-    }
-  ],
+      "flags": [
+        {
+          "type": "overlapping_dates" | "unrealistic_timeline" | "skill_mismatch" | "rapid_progression" | "gap_detected" | "other",
+          "severity": "low" | "medium" | "high",
+          "message": "Clear, neutral description of the review point - plain text only, no markdown",
+          "details": "Optional additional context, if helpful - plain text only, no markdown"
+        }
+      ],
   "timelineAnalysis": {
     "totalYearsExperience": ${totalYearsExperience},
     "averageTenure": ${averageTenureMonths},
@@ -1149,15 +1160,17 @@ Return a JSON response:
   "weakBulletsCount": number of bullets that need improvement,
   "improvedBullets": [
     {
-      "original": "the original weak bullet",
-      "improved": "the stronger rewritten version",
+      "original": "the original weak bullet - plain text only",
+      "improved": "the stronger rewritten version - plain text only, no markdown",
       "improvementType": "added_metrics" | "stronger_verbs" | "added_context" | "quantified_results" | "clarified_impact",
       "confidenceScore": 0-100 (how confident you are in this improvement)
     }
   ],
   "overallImpactScore": 0-100 (how impactful the resume bullets are overall),
-  "suggestions": ["general tips for improving resume impact"]
+  "suggestions": ["general tips for improving resume impact - plain text only, no markdown"]
 }
+
+CRITICAL: All text fields (original, improved, suggestions) must be plain text without markdown formatting. Do NOT use **bold**, *italic*, or any markdown syntax.
 
 EXAMPLES OF IMPROVEMENTS:
 Original: "Worked on backend APIs"
