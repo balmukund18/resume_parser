@@ -61,9 +61,9 @@ export function createRateLimiter(options: {
       res.setHeader("X-RateLimit-Limit", maxRequests.toString());
       res.setHeader("X-RateLimit-Remaining", "0");
       res.setHeader("X-RateLimit-Reset", new Date(record.resetTime).toISOString());
-      
+
       logger.warn(`Rate limit exceeded for ${key}: ${record.count}/${maxRequests} requests`);
-      
+
       return res.status(429).json({
         message: "Too many requests. Please try again later.",
         retryAfter,
@@ -93,21 +93,21 @@ export function createRateLimiter(options: {
 
 // Pre-configured rate limiters
 export const rateLimiters = {
-  // General API rate limit: 100 requests per 15 minutes
+  // General API rate limit: 500 requests per 15 minutes (increased for flexibility)
   general: createRateLimiter({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    maxRequests: 100,
+    maxRequests: 500, // Increased from 100
   }),
 
-  // Upload endpoint: 20 requests per hour (allows for testing and retries)
+  // Upload endpoint: 100 requests per hour (very flexible for testing)
   upload: createRateLimiter({
     windowMs: 60 * 60 * 1000, // 1 hour
-    maxRequests: 20, // Increased from 10 to allow for testing/retries
+    maxRequests: 100, // Increased from 20
   }),
 
-  // Analysis endpoints: 30 requests per hour
+  // Analysis endpoints: 150 requests per hour (flexible for multiple analyses)
   analysis: createRateLimiter({
     windowMs: 60 * 60 * 1000, // 1 hour
-    maxRequests: 30,
+    maxRequests: 150, // Increased from 30
   }),
 };
