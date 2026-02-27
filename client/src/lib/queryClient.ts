@@ -2,7 +2,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 // In production (Vercel), this points to the Render backend URL.
 // In development, it's empty so requests go to the same origin (vite proxy / local server).
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
+export const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {

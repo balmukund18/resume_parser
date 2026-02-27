@@ -12,7 +12,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { SpotlightCard } from "@/components/ui/spotlight-card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, API_BASE } from "@/lib/queryClient";
 import type { ProcessingJob, ParsedResume, ExportFormat, UploadResponse } from "@shared/schema";
 
 type ViewState = "upload" | "processing" | "results";
@@ -27,7 +27,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append("resume", file);
 
-      const res = await fetch("/api/resumes/upload", {
+      const res = await fetch(`${API_BASE}/api/resumes/upload`, {
         method: "POST",
         body: formData,
       });
@@ -98,7 +98,7 @@ export default function Home() {
     if (!currentJobId) return;
 
     try {
-      const res = await fetch(`/api/resumes/${currentJobId}/export`, {
+      const res = await fetch(`${API_BASE}/api/resumes/${currentJobId}/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ format }),
