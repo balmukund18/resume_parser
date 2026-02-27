@@ -40,7 +40,8 @@ export function serveStatic(app: Express) {
 
   // Fall through to index.html for all routes (SPA routing)
   // This must be last, after all API routes
-  app.get("*", (_req, res) => {
+  // Note: Express 5 removed bare "*" wildcard — use regex instead
+  app.get(/\/(.*)/, (_req, res) => {
     const indexPath = path.resolve(distPath!, "index.html");
     if (fs.existsSync(indexPath)) {
       res.sendFile(indexPath);
