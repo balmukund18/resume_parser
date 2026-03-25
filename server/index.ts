@@ -92,7 +92,7 @@ app.use((req, res, next) => {
 
     // Setup authentication (session, passport) before routes
     log("🔐 Setting up authentication...");
-    setupAuth(app);
+    await setupAuth(app);
     log("✅ Authentication configured");
 
     log("📦 Registering routes...");

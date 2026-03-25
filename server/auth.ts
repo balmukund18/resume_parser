@@ -52,7 +52,23 @@ export const requireAuth: RequestHandler = (req, res, next) => {
 };
 
 // ─── Setup function ───
-export function setupAuth(app: Express) {
+export async function setupAuth(app: Express) {
+  // Create session table if it doesn't exist (manual SQL — connect-pg-simple's
+  // createTableIfMissing breaks in esbuild-bundled builds)
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+      ) WITH (OIDS=FALSE);
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+    `);
+  } catch (err) {
+    logger.error(`Failed to create session table: ${err}`);
+  }
+
   // Session store backed by PostgreSQL
   const PgStore = connectPgSimple(session);
 
@@ -60,7 +76,6 @@ export function setupAuth(app: Express) {
     session({
       store: new PgStore({
         pool: pool as any,
-        createTableIfMissing: true,
       }),
       secret: process.env.SESSION_SECRET || "resume-parser-secret",
       resave: false,
