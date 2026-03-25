@@ -91,7 +91,22 @@ export default function Home() {
       if (!res.ok) throw new Error("Failed to load resume");
       return res.json();
     },
+    retry: false,
   });
+
+  // Reset to upload view if the saved resume failed to load (e.g. deleted, wrong user)
+  useEffect(() => {
+    if (currentResumeId && viewState === "results" && !resumeDataFromSaved) {
+      // Check if the query has finished and errored
+      const state = queryClient.getQueryState(["/api/resumes/saved", currentResumeId]);
+      if (state?.status === "error") {
+        setCurrentResumeId(null);
+        setCurrentJobId(null);
+        setViewState("upload");
+        sessionStorage.removeItem("resume-parser-session");
+      }
+    }
+  }, [currentResumeId, viewState, resumeDataFromSaved]);
 
   const resumeData = currentResumeId ? resumeDataFromSaved : resumeDataFromJob;
 
