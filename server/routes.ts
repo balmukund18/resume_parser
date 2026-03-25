@@ -4,6 +4,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "./storage";
+import { requireAuth } from "./auth";
 import { extractText, getFileType, validateMimeType } from "./utils/text-extractor";
 import {
   parseResumeWithAI,
@@ -30,6 +31,11 @@ function getParamId(params: { id?: string | string[] }): string {
     return id[0];
   }
   return id || "";
+}
+
+// Helper to get authenticated user ID
+function getUserId(req: Request): string {
+  return (req.user as Express.User).id;
 }
 
 // Create uploads directory if it doesn't exist
@@ -267,6 +273,12 @@ export async function registerRoutes(
     next();
   });
 
+  // Auth gate: all /api routes except /api/auth/* require authentication
+  app.use("/api", (req: Request, res: Response, next) => {
+    if (req.path.startsWith("/auth")) return next();
+    return requireAuth(req, res, next);
+  });
+
   // Health check endpoint
   app.get("/health", async (req: Request, res: Response) => {
     try {
@@ -347,6 +359,7 @@ export async function registerRoutes(
 
         const file = req.file;
         const fileType = getFileType(file.originalname);
+        const userId = getUserId(req);
 
         if (!fileType) {
           cleanupFile(file.path);
@@ -366,17 +379,18 @@ export async function registerRoutes(
         }
 
         try {
-          // Create job
+          // Create job with userId
           const job = await storage.createJob(
             file.originalname,
             file.size,
-            fileType
+            fileType,
+            userId
           );
 
           logger.info(`Created job ${job.id} for file ${file.originalname}`);
 
-          // Start async processing
-          processResume(job.id, file.path, fileType, file.originalname, file.size);
+          // Start async processing with userId
+          processResume(job.id, file.path, fileType, file.originalname, file.size, userId);
 
           res.status(201).json({
             id: job.id,
@@ -390,6 +404,53 @@ export async function registerRoutes(
       });
     });
 
+  // Delete all resumes (must be before :id routes)
+  app.delete("/api/resumes/all", async (req: Request, res: Response) => {
+    try {
+      const userId = getUserId(req);
+      const count = await storage.deleteAllResumes(userId);
+      logger.info(`Deleted all resumes for user ${userId} (${count} removed)`);
+      res.json({ deleted: count });
+    } catch (error) {
+      logger.error(`Failed to delete all resumes: ${error}`);
+      res.status(500).json({ message: "Failed to delete resumes" });
+    }
+  });
+
+  // Get all saved resumes (must be before :id routes)
+  app.get("/api/resumes/saved/all", async (req: Request, res: Response) => {
+    try {
+      const userId = getUserId(req);
+      const allResumes = await storage.getAllResumes(userId);
+      res.json(allResumes);
+    } catch (error) {
+      logger.error(`Failed to get resumes: ${error}`);
+      res.status(500).json({ message: "Failed to retrieve resumes" });
+    }
+  });
+
+  // Get resume by resume ID (not job ID) — for viewing saved resumes
+  app.get("/api/resumes/saved/:id", async (req: Request, res: Response) => {
+    const id = getParamId(req.params);
+    const validation = validate(idSchema, { id });
+
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+
+    try {
+      const userId = getUserId(req);
+      const parsedResume = await storage.getParsedResume(id, userId);
+      if (!parsedResume) {
+        return res.status(404).json({ message: "Resume not found" });
+      }
+      res.json(parsedResume);
+    } catch (error) {
+      logger.error(`Failed to get resume ${id}: ${error}`);
+      res.status(500).json({ message: "Failed to retrieve resume" });
+    }
+  });
+
   // Get job status
   app.get("/api/resumes/:id/status", async (req: Request, res: Response) => {
     const id = getParamId(req.params);
@@ -399,7 +460,8 @@ export async function registerRoutes(
       return res.status(400).json({ message: validation.error });
     }
 
-    const job = await storage.getJob(id);
+    const userId = getUserId(req);
+    const job = await storage.getJob(id, userId);
 
     if (!job) {
       return res.status(404).json({ message: "Resume not found" });
@@ -419,7 +481,8 @@ export async function registerRoutes(
       return res.status(400).json({ message: validation.error });
     }
 
-    const job = await storage.getJob(id);
+    const userId = getUserId(req);
+    const job = await storage.getJob(id, userId);
 
     if (!job) {
       return res.status(404).json({ message: "Resume not found" });
@@ -450,7 +513,8 @@ export async function registerRoutes(
       return res.status(400).json({ message: formatValidation.error });
     }
 
-    const job = await storage.getJob(id);
+    const userId = getUserId(req);
+    const job = await storage.getJob(id, userId);
 
     if (!job) {
       return res.status(404).json({ message: "Resume not found" });
@@ -460,17 +524,17 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Resume is not yet processed" });
     }
 
-    const { format } = req.body as { format: "json" | "csv" };
+    const { format } = req.body as { format: "json" | "pdf" };
 
-    if (format === "json") {
+    if (format === "pdf") {
+      // PDF is generated client-side; return JSON data for the client to render
       res.setHeader("Content-Type", "application/json");
       res.setHeader("Content-Disposition", `attachment; filename="${job.filename}.json"`);
       res.send(JSON.stringify(job.result, null, 2));
     } else {
-      const csv = resumeToCSV(job.result);
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", `attachment; filename="${job.filename}.csv"`);
-      res.send(csv);
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="${job.filename}.json"`);
+      res.send(JSON.stringify(job.result, null, 2));
     }
   });
 
@@ -495,17 +559,6 @@ export async function registerRoutes(
 
   // ============== NEW ANALYSIS ENDPOINTS ==============
 
-  // Get all saved resumes
-  app.get("/api/resumes/saved/all", async (req: Request, res: Response) => {
-    try {
-      const resumes = await storage.getAllResumes();
-      res.json(resumes);
-    } catch (error) {
-      logger.error(`Failed to get resumes: ${error}`);
-      res.status(500).json({ message: "Failed to retrieve resumes" });
-    }
-  });
-
   // Skills Gap Analysis (with analysis rate limiting)
   app.post("/api/resumes/:id/skills-gap",
     process.env.DISABLE_RATE_LIMIT !== "true" ? rateLimiters.analysis : (req, res, next) => next(),
@@ -522,8 +575,8 @@ export async function registerRoutes(
       }
 
       try {
-        const id = getParamId(req.params);
-        const resume = await storage.getResume(id);
+        const userId = getUserId(req);
+        const resume = await storage.getResume(id, userId);
         if (!resume) {
           return res.status(404).json({ message: "Resume not found" });
         }
@@ -533,6 +586,7 @@ export async function registerRoutes(
           title,
           company: company || null,
           description,
+          userId,
           requiredSkills: [],
           preferredSkills: [],
           keywords: [],
@@ -569,7 +623,8 @@ export async function registerRoutes(
       }
 
       try {
-        const parsedResume = await storage.getParsedResume(id);
+        const userId = getUserId(req);
+        const parsedResume = await storage.getParsedResume(id, userId);
         if (!parsedResume) {
           return res.status(404).json({ message: "Resume not found" });
         }
@@ -591,19 +646,20 @@ export async function registerRoutes(
   app.post("/api/resumes/:id/match-job",
     process.env.DISABLE_RATE_LIMIT !== "true" ? rateLimiters.analysis : (req, res, next) => next(),
     async (req: Request, res: Response) => {
-      const validation = validate(idSchema, { id: req.params.id });
+      const id = getParamId(req.params);
+      const validation = validate(idSchema, { id });
       if (validation.error) {
         return res.status(400).json({ message: validation.error });
       }
 
-      const id = getParamId(req.params);
       const { title, company, description } = req.body as JobDescriptionInput;
       if (!title || !description) {
         return res.status(400).json({ message: "Job title and description are required" });
       }
 
       try {
-        const parsedResume = await storage.getParsedResume(id);
+        const userId = getUserId(req);
+        const parsedResume = await storage.getParsedResume(id, userId);
         if (!parsedResume) {
           return res.status(404).json({ message: "Resume not found" });
         }
@@ -613,6 +669,7 @@ export async function registerRoutes(
           title,
           company: company || null,
           description,
+          userId,
           requiredSkills: [],
           preferredSkills: [],
           keywords: [],
@@ -644,7 +701,8 @@ export async function registerRoutes(
       const { title, description } = req.body as Partial<JobDescriptionInput>;
 
       try {
-        const parsedResume = await storage.getParsedResume(id);
+        const userId = getUserId(req);
+        const parsedResume = await storage.getParsedResume(id, userId);
         if (!parsedResume) {
           return res.status(404).json({ message: "Resume not found" });
         }
@@ -674,7 +732,8 @@ export async function registerRoutes(
       }
 
       try {
-        const parsedResume = await storage.getParsedResume(id);
+        const userId = getUserId(req);
+        const parsedResume = await storage.getParsedResume(id, userId);
         if (!parsedResume) {
           return res.status(404).json({ message: "Resume not found" });
         }
@@ -700,7 +759,8 @@ export async function registerRoutes(
       }
 
       try {
-        const parsedResume = await storage.getParsedResume(id);
+        const userId = getUserId(req);
+        const parsedResume = await storage.getParsedResume(id, userId);
         if (!parsedResume) {
           return res.status(404).json({ message: "Resume not found" });
         }
@@ -742,7 +802,8 @@ export async function registerRoutes(
     }
 
     try {
-      const parsedResume = await storage.getParsedResume(resumeId);
+      const userId = getUserId(req);
+      const parsedResume = await storage.getParsedResume(resumeId, userId);
       if (!parsedResume) {
         return res.status(404).json({ message: "Resume not found" });
       }
@@ -757,7 +818,7 @@ export async function registerRoutes(
         );
         return res.status(503).json({
           message: "Email service not configured",
-          details: "Please set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables to enable email.",
+          details: "Please set the BREVO_API_KEY environment variable to enable email. Optionally set BREVO_FROM_EMAIL for the sender address.",
           configured: false,
         });
       }
@@ -810,11 +871,34 @@ export async function registerRoutes(
   // Get all job descriptions
   app.get("/api/job-descriptions", async (req: Request, res: Response) => {
     try {
-      const jobDescs = await storage.getAllJobDescriptions();
+      const userId = getUserId(req);
+      const jobDescs = await storage.getAllJobDescriptions(userId);
       res.json(jobDescs);
     } catch (error) {
       logger.error(`Failed to get job descriptions: ${error}`);
       res.status(500).json({ message: "Failed to retrieve job descriptions" });
+    }
+  });
+
+  // Delete job description
+  app.delete("/api/job-descriptions/:id", async (req: Request, res: Response) => {
+    const id = getParamId(req.params);
+    const validation = validate(idSchema, { id });
+    if (validation.error) {
+      return res.status(400).json({ message: validation.error });
+    }
+
+    try {
+      const userId = getUserId(req);
+      const deleted = await storage.deleteJobDescription(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Job description not found" });
+      }
+      logger.info(`Deleted job description ${id}`);
+      res.status(204).send();
+    } catch (error) {
+      logger.error(`Failed to delete job description: ${error}`);
+      res.status(500).json({ message: "Failed to delete job description" });
     }
   });
 
@@ -826,10 +910,12 @@ export async function registerRoutes(
     }
 
     try {
+      const userId = getUserId(req);
       const jobDesc = await storage.createJobDescription({
         title,
         company: company || null,
         description,
+        userId,
         requiredSkills: [],
         preferredSkills: [],
         keywords: [],
@@ -850,7 +936,8 @@ async function processResume(
   filePath: string,
   fileType: "pdf" | "docx" | "txt",
   originalFilename: string,
-  fileSize: number
+  fileSize: number,
+  userId: string
 ) {
   const maxRetries = 3;
   let attempt = 0;
@@ -899,8 +986,8 @@ async function processResume(
     // Set the job ID on the resume
     parseResult.resume.id = jobId;
 
-    // Update job with result
-    await storage.setJobResult(jobId, parseResult.resume);
+    // Update job with result (passing userId)
+    await storage.setJobResult(jobId, parseResult.resume, userId);
     logger.info(`Successfully processed job ${jobId}`);
 
   } catch (error) {

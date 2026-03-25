@@ -24,6 +24,8 @@ export function validateEnvironment(): void {
     "SMTP_PASS",
     "FRONTEND_URL",    // Vercel frontend URL - required for CORS in production
     "ALLOWED_ORIGINS", // Comma-separated list of allowed CORS origins (alternative to FRONTEND_URL)
+    "GOOGLE_CLIENT_ID",     // Google OAuth (optional — Google login won't appear if missing)
+    "GOOGLE_CLIENT_SECRET", // Google OAuth
   ];
 
   const missing: string[] = [];

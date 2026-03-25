@@ -3,10 +3,14 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { validateEnvironment } from "./config";
+import { setupAuth } from "./auth";
 import crypto from "crypto";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Trust proxy (Render, Vercel, etc.) — required for secure cookies behind HTTPS proxy
+app.set("trust proxy", 1);
 
 declare module "http" {
   interface IncomingMessage {
@@ -85,6 +89,11 @@ app.use((req, res, next) => {
       console.error("   Add all required variables (DATABASE_URL, GEMINI_API_KEY, SESSION_SECRET)");
       process.exit(1);
     }
+
+    // Setup authentication (session, passport) before routes
+    log("🔐 Setting up authentication...");
+    setupAuth(app);
+    log("✅ Authentication configured");
 
     log("📦 Registering routes...");
     await registerRoutes(httpServer, app);

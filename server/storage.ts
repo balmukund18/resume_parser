@@ -1,6 +1,7 @@
-import { eq, lt, desc } from "drizzle-orm";
+import { eq, lt, desc, and } from "drizzle-orm";
 import { db } from "./db";
 import { 
+  users,
   resumes, 
   processingJobs, 
   jobDescriptions, 
@@ -9,6 +10,8 @@ import {
   resumeScores, 
   keywordRecommendations,
   emailNotifications,
+  type User,
+  type InsertUser,
   type Resume,
   type InsertResume,
   type JobDescription,
@@ -24,18 +27,25 @@ import {
 } from "@shared/schema";
 
 export interface IStorage {
+  // User operations
+  createUser(data: InsertUser): Promise<User>;
+  getUserById(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByGoogleId(googleId: string): Promise<User | undefined>;
+
   // Resume operations
   createResume(data: InsertResume): Promise<Resume>;
-  getResume(id: string): Promise<Resume | undefined>;
-  getParsedResume(id: string): Promise<ParsedResume | undefined>;
-  getAllResumes(): Promise<Resume[]>;
-  deleteResume(id: string): Promise<boolean>;
-  
+  getResume(id: string, userId: string): Promise<Resume | undefined>;
+  getParsedResume(id: string, userId: string): Promise<ParsedResume | undefined>;
+  getAllResumes(userId: string): Promise<Resume[]>;
+  deleteResume(id: string, userId: string): Promise<boolean>;
+  deleteAllResumes(userId: string): Promise<number>;
+
   // Job operations (processing)
-  createJob(filename: string, fileSize: number, fileType: string): Promise<ProcessingJob>;
-  getJob(id: string): Promise<ProcessingJob | undefined>;
+  createJob(filename: string, fileSize: number, fileType: string, userId: string): Promise<ProcessingJob>;
+  getJob(id: string, userId?: string): Promise<ProcessingJob | undefined>;
   updateJobStatus(id: string, status: ProcessingStatus, errorMessage?: string): Promise<ProcessingJob | undefined>;
-  setJobResult(id: string, result: ParsedResume): Promise<ProcessingJob | undefined>;
+  setJobResult(id: string, result: ParsedResume, userId: string): Promise<ProcessingJob | undefined>;
   deleteJob(id: string): Promise<boolean>;
   getAllJobs(): Promise<ProcessingJob[]>;
   cleanupOldJobs(maxAgeMs: number): Promise<number>;
@@ -43,8 +53,8 @@ export interface IStorage {
   // Job descriptions
   createJobDescription(data: InsertJobDescription): Promise<JobDescription>;
   getJobDescription(id: string): Promise<JobDescription | undefined>;
-  getAllJobDescriptions(): Promise<JobDescription[]>;
-  deleteJobDescription(id: string): Promise<boolean>;
+  getAllJobDescriptions(userId: string): Promise<JobDescription[]>;
+  deleteJobDescription(id: string, userId: string): Promise<boolean>;
   
   // Analysis operations
   saveSkillsGapAnalysis(resumeId: string, jobDescriptionId: string, result: SkillsGapResult): Promise<void>;
@@ -57,58 +67,127 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // User operations
+  async createUser(data: InsertUser): Promise<User> {
+    const [user] = await db.insert(users).values(data).returning();
+    return user;
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
+  async getUserByGoogleId(googleId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.googleId, googleId));
+    return user || undefined;
+  }
+
   // Resume operations
   async createResume(data: InsertResume): Promise<Resume> {
     const [resume] = await db.insert(resumes).values(data).returning();
     return resume;
   }
 
-  async getResume(id: string): Promise<Resume | undefined> {
-    const [resume] = await db.select().from(resumes).where(eq(resumes.id, id));
+  async getResume(id: string, userId: string): Promise<Resume | undefined> {
+    const [resume] = await db.select().from(resumes).where(
+      and(eq(resumes.id, id), eq(resumes.userId, userId))
+    );
     return resume || undefined;
   }
 
-  async getParsedResume(id: string): Promise<ParsedResume | undefined> {
-    const resume = await this.getResume(id);
+  async getParsedResume(id: string, userId: string): Promise<ParsedResume | undefined> {
+    const resume = await this.getResume(id, userId);
     if (!resume) return undefined;
     return this.resumeToParsedResume(resume);
   }
 
-  async getAllResumes(): Promise<Resume[]> {
-    return await db.select().from(resumes).orderBy(desc(resumes.createdAt));
+  async getAllResumes(userId: string): Promise<Resume[]> {
+    return await db.select().from(resumes)
+      .where(eq(resumes.userId, userId))
+      .orderBy(desc(resumes.createdAt));
   }
 
-  async deleteResume(id: string): Promise<boolean> {
-    const result = await db.delete(resumes).where(eq(resumes.id, id));
+  async deleteResume(id: string, userId: string): Promise<boolean> {
+    // Verify ownership first
+    const resume = await this.getResume(id, userId);
+    if (!resume) return false;
+
+    // Delete from dependent tables first (foreign key order)
+    await db.delete(skillsGapAnalysis).where(eq(skillsGapAnalysis.resumeId, id));
+    await db.delete(jobMatches).where(eq(jobMatches.resumeId, id));
+    await db.delete(resumeScores).where(eq(resumeScores.resumeId, id));
+    await db.delete(keywordRecommendations).where(eq(keywordRecommendations.resumeId, id));
+    await db.delete(emailNotifications).where(eq(emailNotifications.resumeId, id));
+    await db.delete(processingJobs).where(eq(processingJobs.resumeId, id));
+    const result = await db.delete(resumes).where(
+      and(eq(resumes.id, id), eq(resumes.userId, userId))
+    );
     return (result.rowCount ?? 0) > 0;
   }
 
+  async deleteAllResumes(userId: string): Promise<number> {
+    // Get all resume IDs for this user first
+    const userResumes = await db.select({ id: resumes.id }).from(resumes).where(eq(resumes.userId, userId));
+    const resumeIds = userResumes.map(r => r.id);
+
+    if (resumeIds.length === 0) return 0;
+
+    // Delete from all dependent tables for these resumes
+    for (const rid of resumeIds) {
+      await db.delete(skillsGapAnalysis).where(eq(skillsGapAnalysis.resumeId, rid));
+      await db.delete(jobMatches).where(eq(jobMatches.resumeId, rid));
+      await db.delete(resumeScores).where(eq(resumeScores.resumeId, rid));
+      await db.delete(keywordRecommendations).where(eq(keywordRecommendations.resumeId, rid));
+      await db.delete(emailNotifications).where(eq(emailNotifications.resumeId, rid));
+      await db.delete(processingJobs).where(eq(processingJobs.resumeId, rid));
+    }
+    
+    const result = await db.delete(resumes).where(eq(resumes.userId, userId));
+    return result.rowCount ?? 0;
+  }
+
   // Job (processing) operations
-  async createJob(filename: string, fileSize: number, fileType: string): Promise<ProcessingJob> {
+  async createJob(filename: string, fileSize: number, fileType: string, userId: string): Promise<ProcessingJob> {
     const [job] = await db.insert(processingJobs).values({
       filename,
       fileSize,
       fileType,
+      userId,
       status: "pending",
     }).returning();
     
     return this.dbJobToProcessingJob(job);
   }
 
-  async getJob(id: string): Promise<ProcessingJob | undefined> {
-    const [job] = await db.select().from(processingJobs).where(eq(processingJobs.id, id));
+  async getJob(id: string, userId?: string): Promise<ProcessingJob | undefined> {
+    const conditions = userId 
+      ? and(eq(processingJobs.id, id), eq(processingJobs.userId, userId))
+      : eq(processingJobs.id, id);
+    const [job] = await db.select().from(processingJobs).where(conditions);
     if (!job) return undefined;
     
     // If completed, fetch the resume data
     let result: ParsedResume | undefined;
     if (job.status === "completed" && job.resumeId) {
-      const resume = await this.getResume(job.resumeId);
+      const resume = await this.getResumeById(job.resumeId);
       if (resume) {
         result = this.resumeToParsedResume(resume);
       }
     }
     
     return this.dbJobToProcessingJob(job, result);
+  }
+
+  // Internal: get resume by ID without userId check (for job result lookup)
+  private async getResumeById(id: string): Promise<Resume | undefined> {
+    const [resume] = await db.select().from(resumes).where(eq(resumes.id, id));
+    return resume || undefined;
   }
 
   async updateJobStatus(id: string, status: ProcessingStatus, errorMessage?: string): Promise<ProcessingJob | undefined> {
@@ -135,9 +214,10 @@ export class DatabaseStorage implements IStorage {
     return this.dbJobToProcessingJob(job);
   }
 
-  async setJobResult(id: string, result: ParsedResume): Promise<ProcessingJob | undefined> {
-    // First create the resume
+  async setJobResult(id: string, result: ParsedResume, userId: string): Promise<ProcessingJob | undefined> {
+    // First create the resume with userId
     const resume = await this.createResume({
+      userId,
       name: result.name,
       email: result.contactInfo.email,
       phone: result.contactInfo.phone,
@@ -212,12 +292,16 @@ export class DatabaseStorage implements IStorage {
     return jd || undefined;
   }
 
-  async getAllJobDescriptions(): Promise<JobDescription[]> {
-    return await db.select().from(jobDescriptions).orderBy(desc(jobDescriptions.createdAt));
+  async getAllJobDescriptions(userId: string): Promise<JobDescription[]> {
+    return await db.select().from(jobDescriptions)
+      .where(eq(jobDescriptions.userId, userId))
+      .orderBy(desc(jobDescriptions.createdAt));
   }
 
-  async deleteJobDescription(id: string): Promise<boolean> {
-    const result = await db.delete(jobDescriptions).where(eq(jobDescriptions.id, id));
+  async deleteJobDescription(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(jobDescriptions).where(
+      and(eq(jobDescriptions.id, id), eq(jobDescriptions.userId, userId))
+    );
     return (result.rowCount ?? 0) > 0;
   }
 

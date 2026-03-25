@@ -16,9 +16,21 @@ interface ExtendedContactInfo {
   otherProfiles?: string[];
 }
 
+// Users table - authentication
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  name: text("name").notNull(),
+  password: text("password"), // null for OAuth-only users
+  googleId: text("google_id").unique(),
+  avatar: text("avatar"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Resumes table - stores parsed resume data permanently
 export const resumes = pgTable("resumes", {
   id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
@@ -50,6 +62,7 @@ export const resumes = pgTable("resumes", {
 // Job descriptions table - for matching and gap analysis
 export const jobDescriptions = pgTable("job_descriptions", {
   id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
   title: text("title").notNull(),
   company: text("company"),
   description: text("description").notNull(),
@@ -126,6 +139,7 @@ export const emailNotifications = pgTable("email_notifications", {
 // Processing jobs table (for async processing)
 export const processingJobs = pgTable("processing_jobs", {
   id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
   filename: text("filename").notNull(),
   fileSize: integer("file_size").notNull(),
   fileType: text("file_type").notNull(),
@@ -138,7 +152,14 @@ export const processingJobs = pgTable("processing_jobs", {
 });
 
 // Relations
-export const resumesRelations = relations(resumes, ({ many }) => ({
+export const usersRelations = relations(users, ({ many }) => ({
+  resumes: many(resumes),
+  jobDescriptions: many(jobDescriptions),
+  processingJobs: many(processingJobs),
+}));
+
+export const resumesRelations = relations(resumes, ({ one, many }) => ({
+  user: one(users, { fields: [resumes.userId], references: [users.id] }),
   skillsGapAnalysis: many(skillsGapAnalysis),
   jobMatches: many(jobMatches),
   resumeScores: many(resumeScores),
@@ -147,13 +168,15 @@ export const resumesRelations = relations(resumes, ({ many }) => ({
   processingJobs: many(processingJobs),
 }));
 
-export const jobDescriptionsRelations = relations(jobDescriptions, ({ many }) => ({
+export const jobDescriptionsRelations = relations(jobDescriptions, ({ one, many }) => ({
+  user: one(users, { fields: [jobDescriptions.userId], references: [users.id] }),
   skillsGapAnalysis: many(skillsGapAnalysis),
   jobMatches: many(jobMatches),
   keywordRecommendations: many(keywordRecommendations),
 }));
 
 // Insert schemas
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertResumeSchema = createInsertSchema(resumes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertJobDescriptionSchema = createInsertSchema(jobDescriptions).omit({ id: true, createdAt: true });
 export const insertProcessingJobSchema = createInsertSchema(processingJobs).omit({ id: true, uploadTimestamp: true });
@@ -413,6 +436,8 @@ export type AdditionalLink = z.infer<typeof additionalLinkSchema>;
 export type ParsedLinks = z.infer<typeof parsedLinksSchema>;
 
 // Database types
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
 export type Resume = typeof resumes.$inferSelect;
 export type InsertResume = typeof resumes.$inferInsert;
 export type JobDescription = typeof jobDescriptions.$inferSelect;
@@ -427,7 +452,7 @@ export type UploadResponse = {
 
 export type StatusResponse = ProcessingJob;
 
-export type ExportFormat = "json" | "csv";
+export type ExportFormat = "json" | "pdf";
 
 // Job description input for analysis
 export const jobDescriptionInputSchema = z.object({

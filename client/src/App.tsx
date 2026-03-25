@@ -1,17 +1,60 @@
 import { useEffect } from "react";
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { getSettings } from "@/lib/settings";
+import { useAuth } from "@/hooks/use-auth";
+import { Loader2 } from "lucide-react";
 import Home from "@/pages/home";
+import Compare from "@/pages/compare";
+import Jobs from "@/pages/jobs";
+import Help from "@/pages/help";
+import Settings from "@/pages/settings";
+import Login from "@/pages/login";
 import NotFound from "@/pages/not-found";
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
+
+  return <>{children}</>;
+}
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/login" component={Login} />
+      <Route path="/">
+        <AuthGuard><Home /></AuthGuard>
+      </Route>
+      <Route path="/compare">
+        <AuthGuard><Compare /></AuthGuard>
+      </Route>
+      <Route path="/jobs">
+        <AuthGuard><Jobs /></AuthGuard>
+      </Route>
+      <Route path="/help">
+        <AuthGuard><Help /></AuthGuard>
+      </Route>
+      <Route path="/settings">
+        <AuthGuard><Settings /></AuthGuard>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -19,28 +62,19 @@ function Router() {
 
 function App() {
   useEffect(() => {
-    // Initialize theme from localStorage
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "dark") {
-      document.documentElement.classList.add("dark");
+    const settings = getSettings();
+    if (settings.theme === "system") {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.classList.toggle("dark", prefersDark);
     } else {
-      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.toggle("dark", settings.theme === "dark");
     }
   }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="min-h-screen bg-background relative overflow-hidden bg-noise">
-          {/* Animated Background Gradients */}
-          <div className="fixed inset-0 z-0 pointer-events-none">
-            <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-primary/5 blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
-            <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] rounded-full bg-blue-500/5 blur-3xl animate-pulse" style={{ animationDuration: '6s', animationDelay: '2s' }} />
-          </div>
-
-          <div className="fixed top-2 right-2 sm:top-4 sm:right-4 z-50 pointer-events-auto">
-            <ThemeToggle />
-          </div>
+        <div className="min-h-screen bg-background">
           <Router />
         </div>
         <Toaster />

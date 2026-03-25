@@ -23,8 +23,8 @@ export const uploadSchema = Joi.object({
 
 // Export request validation schema
 export const exportSchema = Joi.object({
-  format: Joi.string().valid("json", "csv").required().messages({
-    "any.only": "Invalid export format. Supported formats: json, csv",
+  format: Joi.string().valid("json", "pdf").required().messages({
+    "any.only": "Invalid export format. Supported formats: json, pdf",
   }),
 });
 
