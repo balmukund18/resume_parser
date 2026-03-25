@@ -210,41 +210,6 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  // CORS middleware (for separated frontend/backend deployments)
-  app.use((req: Request, res: Response, next) => {
-    const origin = req.headers.origin;
-
-    // Build allowed origins list:
-    // 1. ALLOWED_ORIGINS env var (comma-separated list)
-    // 2. FRONTEND_URL env var (single Vercel URL)
-    // 3. Dev defaults
-    const allowedOrigins: string[] = [];
-    if (process.env.ALLOWED_ORIGINS) {
-      allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim()));
-    }
-    if (process.env.FRONTEND_URL) {
-      allowedOrigins.push(process.env.FRONTEND_URL.trim());
-    }
-    if (allowedOrigins.length === 0) {
-      // Default dev origins
-      allowedOrigins.push("http://localhost:5000", "http://localhost:5173");
-    }
-
-    if (origin && (allowedOrigins.includes(origin) || process.env.NODE_ENV === "development")) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-    }
-
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-
-    if (req.method === "OPTIONS") {
-      return res.sendStatus(200);
-    }
-
-    next();
-  });
-
   // Rate limiting - apply general rate limit to all API routes
   // Can be disabled with DISABLE_RATE_LIMIT=true for testing
   if (process.env.DISABLE_RATE_LIMIT !== "true") {

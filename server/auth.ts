@@ -329,11 +329,29 @@ export async function setupAuth(app: Express) {
 
     app.get(
       "/api/auth/google/callback",
-      passport.authenticate("google", { failureRedirect: "/login" }),
-      (req, res) => {
-        // Redirect to frontend
-        const frontendUrl = process.env.FRONTEND_URL || "/";
-        res.redirect(frontendUrl);
+      (req, res, next) => {
+        passport.authenticate("google", (err: Error | null, user: Express.User | false, info: any) => {
+          if (err) {
+            logger.error(`Google OAuth error: ${err.message}`);
+            const frontendUrl = process.env.FRONTEND_URL || "";
+            return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
+          }
+          if (!user) {
+            logger.error(`Google OAuth: no user returned. Info: ${JSON.stringify(info)}`);
+            const frontendUrl = process.env.FRONTEND_URL || "";
+            return res.redirect(`${frontendUrl}/login?error=oauth_denied`);
+          }
+          req.login(user, (err) => {
+            if (err) {
+              logger.error(`Google OAuth login error: ${err}`);
+              const frontendUrl = process.env.FRONTEND_URL || "";
+              return res.redirect(`${frontendUrl}/login?error=login_failed`);
+            }
+            logger.info(`Google OAuth login: ${user.email}`);
+            const frontendUrl = process.env.FRONTEND_URL || "/";
+            res.redirect(frontendUrl);
+          });
+        })(req, res, next);
       }
     );
   }

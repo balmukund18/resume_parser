@@ -30,6 +30,31 @@ app.use(
 
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 
+// CORS middleware — must be before auth routes so auth endpoints get proper headers
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins: string[] = [];
+  if (process.env.ALLOWED_ORIGINS) {
+    allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim()));
+  }
+  if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL.trim());
+  }
+  if (allowedOrigins.length === 0) {
+    allowedOrigins.push("http://localhost:5000", "http://localhost:5173");
+  }
+  if (origin && (allowedOrigins.includes(origin) || process.env.NODE_ENV !== "production")) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 // Request ID middleware for better logging and tracing
 app.use((req, res, next) => {
   const requestId = crypto.randomUUID();
