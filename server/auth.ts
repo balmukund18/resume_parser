@@ -330,12 +330,18 @@ export async function setupAuth(app: Express) {
     app.get(
       "/api/auth/google/callback",
       (req, res, next) => {
-        const frontendUrl = process.env.FRONTEND_URL || "/";
+        // Sanitize frontend URL: trim whitespace, remove trailing slash
+        const rawFrontend = (process.env.FRONTEND_URL || "").trim().replace(/\/+$/, "");
+        const frontendUrl = rawFrontend || "/";
+
+        // If user is already authenticated (from a prior successful callback),
+        // skip Passport entirely — prevents duplicate auth-code errors
+        if (req.isAuthenticated()) {
+          logger.info("Google OAuth callback: user already authenticated, redirecting");
+          return res.redirect(frontendUrl);
+        }
 
         passport.authenticate("google", (err: Error | null, user: Express.User | false, info: any) => {
-          // On error (e.g. duplicate callback with already-used auth code),
-          // redirect to frontend. If first callback already established the
-          // session, user will land on dashboard. Otherwise AuthGuard → login.
           if (err) {
             logger.error(`Google OAuth error: ${err.message}`);
             return res.redirect(frontendUrl);
