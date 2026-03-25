@@ -330,25 +330,26 @@ export async function setupAuth(app: Express) {
     app.get(
       "/api/auth/google/callback",
       (req, res, next) => {
+        const frontendUrl = process.env.FRONTEND_URL || "/";
+
         passport.authenticate("google", (err: Error | null, user: Express.User | false, info: any) => {
+          // On error (e.g. duplicate callback with already-used auth code),
+          // redirect to frontend. If first callback already established the
+          // session, user will land on dashboard. Otherwise AuthGuard → login.
           if (err) {
             logger.error(`Google OAuth error: ${err.message}`);
-            const frontendUrl = process.env.FRONTEND_URL || "";
-            return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
+            return res.redirect(frontendUrl);
           }
           if (!user) {
-            logger.error(`Google OAuth: no user returned. Info: ${JSON.stringify(info)}`);
-            const frontendUrl = process.env.FRONTEND_URL || "";
-            return res.redirect(`${frontendUrl}/login?error=oauth_denied`);
+            logger.warn(`Google OAuth: no user returned. Info: ${JSON.stringify(info)}`);
+            return res.redirect(frontendUrl);
           }
-          req.login(user, (err) => {
-            if (err) {
-              logger.error(`Google OAuth login error: ${err}`);
-              const frontendUrl = process.env.FRONTEND_URL || "";
-              return res.redirect(`${frontendUrl}/login?error=login_failed`);
+          req.login(user, (loginErr) => {
+            if (loginErr) {
+              logger.error(`Google OAuth login error: ${loginErr}`);
+              return res.redirect(frontendUrl);
             }
             logger.info(`Google OAuth login: ${user.email}`);
-            const frontendUrl = process.env.FRONTEND_URL || "/";
             res.redirect(frontendUrl);
           });
         })(req, res, next);

@@ -198,28 +198,63 @@ export function AnalysisPanel({ resumeId }: AnalysisPanelProps) {
       {/* Header */}
       <h2 className="text-sm font-semibold mb-4">AI Insights</h2>
 
-      {/* Score summary (always visible) */}
-      {resumeScore ? (
-        <div className="flex items-center gap-4 mb-5">
-          <ScoreDonut score={resumeScore.overallScore} label="ATS SCORE" size={90} />
-          {keywordResult && (
-            <div className="text-right">
-              <span className="text-[10px] text-muted-foreground block">Estimated</span>
-              <span className="text-[10px] text-muted-foreground block">Interview Probability</span>
-              <span className="text-xl font-bold text-[#2da77d]">{Math.round(keywordResult.atsScore)}%</span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="flex justify-center mb-5">
-          <div className="text-center">
-            <div className="w-20 h-20 rounded-full border-[6px] border-muted flex items-center justify-center mx-auto mb-2">
-              <span className="text-lg font-bold text-muted-foreground">?</span>
-            </div>
-            <p className="text-[11px] text-muted-foreground">Run Score to see insights</p>
+      {/* Score summary — shows active tab's score */}
+      {(() => {
+        // Determine which score + label to show based on active tab
+        let score: number | null = null;
+        let label = "";
+        let secondaryLabel = "";
+        let secondaryValue: number | null = null;
+
+        switch (activeTab) {
+          case "score":
+            score = resumeScore?.overallScore ?? null;
+            label = "SCORE";
+            if (keywordResult) { secondaryLabel = "ATS Score"; secondaryValue = keywordResult.atsScore; }
+            break;
+          case "credibility":
+            score = credibilityResult?.credibilityScore ?? null;
+            label = "CREDIBILITY";
+            break;
+          case "impact":
+            score = impactResult?.overallImpactScore ?? null;
+            label = "IMPACT";
+            break;
+          case "skills":
+            score = skillsGapResult?.matchScore ?? jobMatchResult?.matchScore ?? null;
+            label = "MATCH";
+            break;
+          case "keywords":
+            score = keywordResult?.atsScore ?? null;
+            label = "ATS";
+            if (resumeScore) { secondaryLabel = "Resume Score"; secondaryValue = resumeScore.overallScore; }
+            break;
+          default:
+            score = resumeScore?.overallScore ?? null;
+            label = "SCORE";
+        }
+
+        return score !== null ? (
+          <div className="flex items-center gap-4 mb-5">
+            <ScoreDonut score={score} label={label} size={90} />
+            {secondaryValue !== null && (
+              <div className="text-right">
+                <span className="text-[10px] text-muted-foreground block">{secondaryLabel}</span>
+                <span className="text-xl font-bold text-[#2da77d]">{Math.round(secondaryValue)}%</span>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="flex justify-center mb-5">
+            <div className="text-center">
+              <div className="w-20 h-20 rounded-full border-[6px] border-muted flex items-center justify-center mx-auto mb-2">
+                <span className="text-lg font-bold text-muted-foreground">?</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Run analysis to see insights</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Tab navigation */}
       <div className="flex flex-wrap gap-1 mb-4 p-1 bg-muted/50 rounded-lg">
