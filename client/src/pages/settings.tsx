@@ -61,7 +61,7 @@ export default function Settings() {
 
   // Load health status and saved resumes on mount
   useEffect(() => {
-    fetch(`${API_BASE}/health`)
+    fetch(`${API_BASE}/health`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => setHealthStatus({
         status: data.status || "unknown",
@@ -69,7 +69,7 @@ export default function Settings() {
       }))
       .catch(() => setHealthStatus({ status: "unreachable" }));
 
-    fetch(`${API_BASE}/api/resumes/saved/all`)
+    fetch(`${API_BASE}/api/resumes/saved/all`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => setSavedResumes(data))
       .catch(() => setSavedResumes([]))
@@ -108,7 +108,7 @@ export default function Settings() {
     if (!window.confirm("Delete this resume permanently from the server?")) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`${API_BASE}/api/resumes/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/api/resumes/${id}`, { method: "DELETE", credentials: "include" });
       if (res.ok) {
         setSavedResumes((prev) => prev.filter((r) => r.id !== id));
         toast({ title: "Resume deleted", description: "Resume has been permanently removed." });
@@ -126,7 +126,7 @@ export default function Settings() {
     if (!window.confirm(`Delete all ${savedResumes.length} resumes permanently? This cannot be undone.`)) return;
     setDeletingAll(true);
     try {
-      const res = await fetch(`${API_BASE}/api/resumes/all`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/api/resumes/all`, { method: "DELETE", credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setSavedResumes([]);

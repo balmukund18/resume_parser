@@ -37,7 +37,7 @@ export default function Jobs() {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/job-descriptions`)
+    fetch(`${API_BASE}/api/job-descriptions`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => setJobs(data))
       .catch(() => setJobs([]))
@@ -55,6 +55,7 @@ export default function Jobs() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title.trim(), company: company.trim() || undefined, description: description.trim() }),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create");
       const newJob = await res.json();
@@ -75,7 +76,7 @@ export default function Jobs() {
     if (!window.confirm("Delete this job description?")) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`${API_BASE}/api/job-descriptions/${id}`, { method: "DELETE" });
+      const res = await fetch(`${API_BASE}/api/job-descriptions/${id}`, { method: "DELETE", credentials: "include" });
       if (res.ok || res.status === 204) {
         setJobs((prev) => prev.filter((j) => j.id !== id));
         if (selectedJob?.id === id) setSelectedJob(null);

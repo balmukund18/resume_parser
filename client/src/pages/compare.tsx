@@ -32,7 +32,7 @@ export default function Compare() {
   const [comparing, setComparing] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/resumes/saved/all`)
+    fetch(`${API_BASE}/api/resumes/saved/all`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => setResumes(data))
       .catch(() => setResumes([]))
@@ -46,8 +46,8 @@ export default function Compare() {
     setResumeB(null);
     try {
       const [resA, resB] = await Promise.all([
-        fetch(`${API_BASE}/api/resumes/saved/${selectedA}`).then((r) => r.json()),
-        fetch(`${API_BASE}/api/resumes/saved/${selectedB}`).then((r) => r.json()),
+        fetch(`${API_BASE}/api/resumes/saved/${selectedA}`, { credentials: "include" }).then((r) => r.json()),
+        fetch(`${API_BASE}/api/resumes/saved/${selectedB}`, { credentials: "include" }).then((r) => r.json()),
       ]);
       setResumeA(resA);
       setResumeB(resB);

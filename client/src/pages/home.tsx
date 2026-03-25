@@ -48,6 +48,7 @@ export default function Home() {
       const res = await fetch(`${API_BASE}/api/resumes/upload`, {
         method: "POST",
         body: formData,
+        credentials: "include",
       });
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: "Upload failed" }));
@@ -86,7 +87,7 @@ export default function Home() {
     queryKey: ["/api/resumes/saved", currentResumeId],
     enabled: !!currentResumeId && viewState === "results",
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/resumes/saved/${currentResumeId}`);
+      const res = await fetch(`${API_BASE}/api/resumes/saved/${currentResumeId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load resume");
       return res.json();
     },
@@ -135,6 +136,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ format }),
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
@@ -320,7 +322,7 @@ function UploadView({ onFileSelect, isUploading, onLoadResume }: {
   const [resumesLoading, setResumesLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/resumes/saved/all`)
+    fetch(`${API_BASE}/api/resumes/saved/all`, { credentials: "include" })
       .then((res) => res.json())
       .then((data) => setSavedResumes(data))
       .catch(() => setSavedResumes([]))
