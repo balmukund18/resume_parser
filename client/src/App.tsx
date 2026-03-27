@@ -13,6 +13,7 @@ import Jobs from "@/pages/jobs";
 import Help from "@/pages/help";
 import Settings from "@/pages/settings";
 import Login from "@/pages/login";
+import AuthCallback from "@/pages/auth-callback";
 import NotFound from "@/pages/not-found";
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -40,6 +41,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/">
         <AuthGuard><Home /></AuthGuard>
       </Route>

@@ -11,6 +11,32 @@ import { createModuleLogger } from "./utils/logger";
 
 const logger = createModuleLogger("Auth");
 
+// ─── One-time auth tokens for cross-domain OAuth ───
+const authTokens = new Map<string, { user: Express.User; expiresAt: number }>();
+
+function generateAuthToken(user: Express.User): string {
+  const token = crypto.randomBytes(32).toString("hex");
+  // Token expires in 60 seconds — only used during the redirect
+  authTokens.set(token, { user, expiresAt: Date.now() + 60_000 });
+  return token;
+}
+
+function consumeAuthToken(token: string): Express.User | null {
+  const entry = authTokens.get(token);
+  if (!entry) return null;
+  authTokens.delete(token);
+  if (Date.now() > entry.expiresAt) return null;
+  return entry.user;
+}
+
+// Clean up expired tokens every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  authTokens.forEach((entry, token) => {
+    if (now > entry.expiresAt) authTokens.delete(token);
+  });
+}, 5 * 60_000);
+
 // ─── Express.User type augmentation ───
 declare global {
   namespace Express {
@@ -343,23 +369,48 @@ export async function setupAuth(app: Express) {
             logger.warn(`Google OAuth: no user returned. Info: ${JSON.stringify(info)}`);
             return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
           }
-          // Always call req.login to establish/refresh the session
-          req.login(user, (loginErr) => {
-            if (loginErr) {
-              logger.error(`Google OAuth login error: ${loginErr}`);
-              return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
-            }
-            // Explicitly save session to DB before redirecting so the cookie
-            // is valid immediately when the frontend makes its first API call
-            req.session.save((saveErr) => {
-              if (saveErr) logger.error(`Session save error: ${saveErr}`);
-              logger.info(`Google OAuth login: ${user.email}`);
-              res.redirect(frontendUrl);
-            });
-          });
+
+          // Cross-domain flow: pass a one-time token in the URL instead of
+          // relying on the session cookie surviving the cross-domain redirect.
+          // The frontend will exchange this token via an API call which
+          // establishes the session properly.
+          const token = generateAuthToken(user);
+          logger.info(`Google OAuth success: ${user.email}, redirecting with auth token`);
+          res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
         })(req, res, next);
       }
     );
+
+    // Exchange a one-time auth token for a session (used after Google OAuth redirect)
+    app.post("/api/auth/exchange-token", (req, res) => {
+      const { token } = req.body;
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Token is required" });
+      }
+
+      const user = consumeAuthToken(token);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid or expired token" });
+      }
+
+      req.login(user, (err) => {
+        if (err) {
+          logger.error(`Token exchange login error: ${err}`);
+          return res.status(500).json({ message: "Login failed" });
+        }
+        req.session.save((saveErr) => {
+          if (saveErr) logger.error(`Token exchange session save error: ${saveErr}`);
+          logger.info(`Token exchange login: ${user.email}`);
+          res.json({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            avatar: user.avatar,
+            googleId: user.googleId,
+          });
+        });
+      });
+    });
   }
 
   logger.info("Auth system initialized");
