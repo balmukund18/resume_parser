@@ -334,29 +334,28 @@ export async function setupAuth(app: Express) {
         const rawFrontend = (process.env.FRONTEND_URL || "").trim().replace(/\/+$/, "");
         const frontendUrl = rawFrontend || "/";
 
-        // If user is already authenticated (from a prior successful callback),
-        // skip Passport entirely — prevents duplicate auth-code errors
-        if (req.isAuthenticated()) {
-          logger.info("Google OAuth callback: user already authenticated, redirecting");
-          return res.redirect(frontendUrl);
-        }
-
         passport.authenticate("google", (err: Error | null, user: Express.User | false, info: any) => {
           if (err) {
             logger.error(`Google OAuth error: ${err.message}`);
-            return res.redirect(frontendUrl);
+            return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
           }
           if (!user) {
             logger.warn(`Google OAuth: no user returned. Info: ${JSON.stringify(info)}`);
-            return res.redirect(frontendUrl);
+            return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
           }
+          // Always call req.login to establish/refresh the session
           req.login(user, (loginErr) => {
             if (loginErr) {
               logger.error(`Google OAuth login error: ${loginErr}`);
-              return res.redirect(frontendUrl);
+              return res.redirect(`${frontendUrl}/login?error=oauth_failed`);
             }
-            logger.info(`Google OAuth login: ${user.email}`);
-            res.redirect(frontendUrl);
+            // Explicitly save session to DB before redirecting so the cookie
+            // is valid immediately when the frontend makes its first API call
+            req.session.save((saveErr) => {
+              if (saveErr) logger.error(`Session save error: ${saveErr}`);
+              logger.info(`Google OAuth login: ${user.email}`);
+              res.redirect(frontendUrl);
+            });
           });
         })(req, res, next);
       }
