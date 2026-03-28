@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
+import { queryClient, apiRequest, getQueryFn, setAuthToken, clearAuthToken } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 
 interface AuthUser {
@@ -8,6 +8,16 @@ interface AuthUser {
   name: string;
   avatar: string | null;
   googleId: string | null;
+  authToken?: string;
+}
+
+function handleAuthResponse(user: AuthUser) {
+  if (user.authToken) {
+    setAuthToken(user.authToken);
+  }
+  // Strip token before caching (no need to keep it in React Query state)
+  const { authToken: _, ...userData } = user;
+  queryClient.setQueryData(["/api/auth/user"], userData);
 }
 
 export function useAuth() {
@@ -27,9 +37,7 @@ export function useAuth() {
       const res = await apiRequest("POST", "/api/auth/login", credentials);
       return res.json() as Promise<AuthUser>;
     },
-    onSuccess: (user) => {
-      queryClient.setQueryData(["/api/auth/user"], user);
-    },
+    onSuccess: handleAuthResponse,
   });
 
   const registerMutation = useMutation({
@@ -37,9 +45,7 @@ export function useAuth() {
       const res = await apiRequest("POST", "/api/auth/register", data);
       return res.json() as Promise<AuthUser>;
     },
-    onSuccess: (user) => {
-      queryClient.setQueryData(["/api/auth/user"], user);
-    },
+    onSuccess: handleAuthResponse,
   });
 
   const logoutMutation = useMutation({
@@ -47,6 +53,7 @@ export function useAuth() {
       await apiRequest("POST", "/api/auth/logout");
     },
     onSuccess: () => {
+      clearAuthToken();
       queryClient.clear();
       window.location.href = "/login";
     },

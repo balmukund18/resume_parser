@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Loader2, AlertCircle } from "lucide-react";
-import { queryClient, API_BASE } from "@/lib/queryClient";
+import { queryClient, API_BASE, setAuthToken } from "@/lib/queryClient";
 
 export default function AuthCallback() {
   const search = useSearch();
@@ -17,12 +17,10 @@ export default function AuthCallback() {
       return;
     }
 
-    // Exchange the one-time token for a session
     fetch(`${API_BASE}/api/auth/exchange-token`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
-      credentials: "include",
     })
       .then(async (res) => {
         if (!res.ok) {
@@ -32,8 +30,13 @@ export default function AuthCallback() {
         return res.json();
       })
       .then((user) => {
-        // Set user in React Query cache so AuthGuard sees it immediately
-        queryClient.setQueryData(["/api/auth/user"], user);
+        // Store the bearer token for all future API calls
+        if (user.authToken) {
+          setAuthToken(user.authToken);
+        }
+        // Cache user data (without token) so AuthGuard sees it immediately
+        const { authToken: _, ...userData } = user;
+        queryClient.setQueryData(["/api/auth/user"], userData);
         navigate("/", { replace: true });
       })
       .catch((err) => {

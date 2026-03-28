@@ -4,6 +4,47 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 // In development, it's empty so requests go to the same origin (vite proxy / local server).
 export const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
+// ─── Auth token helpers (localStorage-based, works cross-domain) ───
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem("auth_token");
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string) {
+  try {
+    localStorage.setItem("auth_token", token);
+  } catch { /* ignore */ }
+}
+
+export function clearAuthToken() {
+  try {
+    localStorage.removeItem("auth_token");
+  } catch { /* ignore */ }
+}
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...extra };
+  const token = getAuthToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+// Drop-in replacement for fetch() that adds the bearer token automatically.
+// Use this for all API calls outside of React Query / apiRequest.
+export function authFetch(input: string, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  const token = getAuthToken();
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  return fetch(input, { ...init, headers, credentials: "include" });
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -18,7 +59,7 @@ export async function apiRequest(
 ): Promise<Response> {
   const res = await fetch(`${API_BASE}${url}`, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: authHeaders(data ? { "Content-Type": "application/json" } : undefined),
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -34,6 +75,7 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
     async ({ queryKey }) => {
       const res = await fetch(`${API_BASE}${queryKey.join("/")}`, {
+        headers: authHeaders(),
         credentials: "include",
       });
 

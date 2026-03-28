@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { useToast } from "@/hooks/use-toast";
-import { API_BASE } from "@/lib/queryClient";
+import { API_BASE, authFetch } from "@/lib/queryClient";
 import { getSettings, saveSetting, resetSettings } from "@/lib/settings";
 import type { AppSettings } from "@/lib/settings";
 
@@ -61,7 +61,7 @@ export default function Settings() {
 
   // Load health status and saved resumes on mount
   useEffect(() => {
-    fetch(`${API_BASE}/health`, { credentials: "include" })
+    authFetch(`${API_BASE}/health`)
       .then((res) => res.json())
       .then((data) => setHealthStatus({
         status: data.status || "unknown",
@@ -69,7 +69,7 @@ export default function Settings() {
       }))
       .catch(() => setHealthStatus({ status: "unreachable" }));
 
-    fetch(`${API_BASE}/api/resumes/saved/all`, { credentials: "include" })
+    authFetch(`${API_BASE}/api/resumes/saved/all`)
       .then((res) => res.json())
       .then((data) => setSavedResumes(data))
       .catch(() => setSavedResumes([]))
@@ -108,7 +108,7 @@ export default function Settings() {
     if (!window.confirm("Delete this resume permanently from the server?")) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`${API_BASE}/api/resumes/${id}`, { method: "DELETE", credentials: "include" });
+      const res = await authFetch(`${API_BASE}/api/resumes/${id}`, { method: "DELETE" });
       if (res.ok) {
         setSavedResumes((prev) => prev.filter((r) => r.id !== id));
         toast({ title: "Resume deleted", description: "Resume has been permanently removed." });
@@ -126,7 +126,7 @@ export default function Settings() {
     if (!window.confirm(`Delete all ${savedResumes.length} resumes permanently? This cannot be undone.`)) return;
     setDeletingAll(true);
     try {
-      const res = await fetch(`${API_BASE}/api/resumes/all`, { method: "DELETE", credentials: "include" });
+      const res = await authFetch(`${API_BASE}/api/resumes/all`, { method: "DELETE" });
       if (res.ok) {
         const data = await res.json();
         setSavedResumes([]);

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
-import { API_BASE } from "@/lib/queryClient";
+import { API_BASE, authFetch } from "@/lib/queryClient";
 import type { ParsedResume } from "@shared/schema";
 
 interface SavedResumeItem {
@@ -32,7 +32,7 @@ export default function Compare() {
   const [comparing, setComparing] = useState(false);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/resumes/saved/all`, { credentials: "include" })
+    authFetch(`${API_BASE}/api/resumes/saved/all`)
       .then((res) => res.json())
       .then((data) => setResumes(data))
       .catch(() => setResumes([]))
@@ -46,8 +46,8 @@ export default function Compare() {
     setResumeB(null);
     try {
       const [resA, resB] = await Promise.all([
-        fetch(`${API_BASE}/api/resumes/saved/${selectedA}`, { credentials: "include" }).then((r) => r.json()),
-        fetch(`${API_BASE}/api/resumes/saved/${selectedB}`, { credentials: "include" }).then((r) => r.json()),
+        authFetch(`${API_BASE}/api/resumes/saved/${selectedA}`).then((r) => r.json()),
+        authFetch(`${API_BASE}/api/resumes/saved/${selectedB}`).then((r) => r.json()),
       ]);
       setResumeA(resA);
       setResumeB(resB);

@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { useToast } from "@/hooks/use-toast";
-import { API_BASE } from "@/lib/queryClient";
+import { API_BASE, authFetch } from "@/lib/queryClient";
 
 interface JobDescription {
   id: string;
@@ -37,7 +37,7 @@ export default function Jobs() {
   const { toast } = useToast();
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/job-descriptions`, { credentials: "include" })
+    authFetch(`${API_BASE}/api/job-descriptions`)
       .then((res) => res.json())
       .then((data) => setJobs(data))
       .catch(() => setJobs([]))
@@ -51,11 +51,10 @@ export default function Jobs() {
     }
     setCreating(true);
     try {
-      const res = await fetch(`${API_BASE}/api/job-descriptions`, {
+      const res = await authFetch(`${API_BASE}/api/job-descriptions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: title.trim(), company: company.trim() || undefined, description: description.trim() }),
-        credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to create");
       const newJob = await res.json();
@@ -76,7 +75,7 @@ export default function Jobs() {
     if (!window.confirm("Delete this job description?")) return;
     setDeletingId(id);
     try {
-      const res = await fetch(`${API_BASE}/api/job-descriptions/${id}`, { method: "DELETE", credentials: "include" });
+      const res = await authFetch(`${API_BASE}/api/job-descriptions/${id}`, { method: "DELETE" });
       if (res.ok || res.status === 204) {
         setJobs((prev) => prev.filter((j) => j.id !== id));
         if (selectedJob?.id === id) setSelectedJob(null);

@@ -10,7 +10,7 @@ import { ResumeResults } from "@/components/resume-results";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, API_BASE } from "@/lib/queryClient";
+import { queryClient, API_BASE, authFetch, getAuthToken } from "@/lib/queryClient";
 import { generateResumePDF } from "@/lib/pdf-export";
 import type { ProcessingJob, ParsedResume, ExportFormat, UploadResponse } from "@shared/schema";
 
@@ -45,9 +45,13 @@ export default function Home() {
     mutationFn: async (file: File): Promise<UploadResponse> => {
       const formData = new FormData();
       formData.append("resume", file);
+      const headers: Record<string, string> = {};
+      const token = getAuthToken();
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const res = await fetch(`${API_BASE}/api/resumes/upload`, {
         method: "POST",
         body: formData,
+        headers,
         credentials: "include",
       });
       if (!res.ok) {
@@ -87,7 +91,7 @@ export default function Home() {
     queryKey: ["/api/resumes/saved", currentResumeId],
     enabled: !!currentResumeId && viewState === "results",
     queryFn: async () => {
-      const res = await fetch(`${API_BASE}/api/resumes/saved/${currentResumeId}`, { credentials: "include" });
+      const res = await authFetch(`${API_BASE}/api/resumes/saved/${currentResumeId}`);
       if (!res.ok) throw new Error("Failed to load resume");
       return res.json();
     },
@@ -147,11 +151,10 @@ export default function Home() {
         toast({ title: "Export successful", description: "Resume exported as PDF" });
         return;
       }
-      const res = await fetch(`${API_BASE}/api/resumes/${exportId}/export`, {
+      const res = await authFetch(`${API_BASE}/api/resumes/${exportId}/export`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ format }),
-        credentials: "include",
       });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
@@ -337,7 +340,7 @@ function UploadView({ onFileSelect, isUploading, onLoadResume }: {
   const [resumesLoading, setResumesLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/resumes/saved/all`, { credentials: "include" })
+    authFetch(`${API_BASE}/api/resumes/saved/all`)
       .then((res) => res.json())
       .then((data) => setSavedResumes(data))
       .catch(() => setSavedResumes([]))
